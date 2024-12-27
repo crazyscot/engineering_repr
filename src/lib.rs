@@ -122,15 +122,20 @@ macro_rules! impl_from_int {
 
 impl_from_int!(u8, u16, u32, u64, i8, i16, i32, i64, i128);
 
-impl TryFrom<u128> for EngineeringExponential {
-    type Error = EEError;
+macro_rules! impl_try_from_int {
+    {$($t:ty),+} => {$(
+        impl TryFrom<$t> for EngineeringExponential {
+            type Error = EEError;
+            fn try_from(value: $t) -> Result<Self, Self::Error> {
+                let v = i128::try_from(value).map_err(|_|EEError::Overflow)?;
+                Ok(Self::new(v, 0))
+            }
+        }
+    )+}
 
-    /// This conversion is checked, because it might overflow the internal representation (i128).
-    fn try_from(value: u128) -> Result<Self, Self::Error> {
-        let v = i128::try_from(value).map_err(|_| EEError::Overflow)?;
-        Ok(Self::new(v, 1))
-    }
 }
+
+impl_try_from_int!(u128, usize, isize);
 
 /////////////////////////////////////////////////////////////////////////
 // CONVERSION TO INTEGER
