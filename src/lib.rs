@@ -56,7 +56,7 @@ const MAX_EXPONENT_U128: u32 = 12;
 /// An integer which can be expressed in engineering notation.
 ///
 /// The input is retained at full precision and may be retrieved with [`EngineeringExponential::value()`].
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Default)]
+#[derive(Debug, Clone, Copy, Eq, Default)]
 pub struct EngineeringExponential {
     significand: i128,
     /// Exponent in 10^3 i.e. 0 => 1, 1 => 1000, 2 => 10^6, etc.
@@ -80,6 +80,30 @@ impl EngineeringExponential {
     #[must_use]
     pub fn contents(self) -> (i128, u32) {
         (self.significand, self.exponent_1e3)
+    }
+}
+
+impl PartialEq for EngineeringExponential {
+    fn eq(&self, other: &Self) -> bool {
+        // Try the easy case first
+        if self.exponent_1e3 == other.exponent_1e3 {
+            return self.significand == other.significand;
+        }
+        // Scale one to meet the other
+        let (mut big, small) = if self.exponent_1e3 > other.exponent_1e3 {
+            (*self, other)
+        } else {
+            (*other, self)
+        };
+        // at this point big might be (1,1) and small (1000,0)
+        big.significand *=
+            if let Some(s) = 1000i128.checked_pow(big.exponent_1e3 - small.exponent_1e3) {
+                s
+            } else {
+                return false;
+            };
+        // big.exponent_1e3 = small.exponent_1e3; // by definition
+        big.significand == small.significand
     }
 }
 
@@ -473,6 +497,20 @@ mod test {
             let _ = EE::from_str(s).expect_err(&format!("this should have failed: {s}"));
         }
     }
+    #[test]
+    fn equality() {
+        for (a, b, c, d) in &[
+            (1, 0, 1, 0),
+            (1, 1, 1000, 0),
+            (2000, 0, 2, 1),
+            (123_000_000, 0, 123_000, 1),
+            (123_000_000, 0, 123, 2),
+            (456_000_000_000_000, 0, 456_000, 3),
+            (456_000_000_000_000, 0, 456, 4),
+        ] {
+            let e1 = EE::new(*a, *b);
+            let e2 = EE::new(*c, *d);
+            assert_eq!(e1, e2);
         }
     }
 }
