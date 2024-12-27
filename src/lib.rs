@@ -1,7 +1,61 @@
+// (c) 2024 Ross Younger
+
+//! Numeric conversions for [engineering notation](https://en.wikipedia.org/wiki/Engineering_notation)
+//!
+//! ## Overview
+//!
+//! ### String to number
+//! ```
+//! use engineering_repr::EngineeringExponential as EE;
+//! use std::str::FromStr;
+//!
+//! // Integers (positive and negative) with trailing SI multiplier
+//! assert_eq!(EE::from_str("1k").unwrap().value(), 1000);
+//! assert_eq!(EE::from_str("42M").unwrap().value(), 42_000_000);
+//! assert_eq!(EE::from_str("-4k").unwrap().value(), -4000);
+//!
+//! // Decimals _provided the result is still an integer_
+//! assert_eq!(EE::from_str("1.1G").unwrap().value(), 1_100_000_000);
+//! assert_eq!(EE::from_str("37.5k").unwrap().value(), 37_500);
+//! assert_eq!(EE::from_str("-27.1M").unwrap().value(), -27_100_000);
+//!
+//! // Support for the new multipliers 'R' and 'Q' added in 2022
+//! assert_eq!(EE::from_str("-12.345R").unwrap().value(), -12_345_000_000_000_000_000_000_000_000);
+//! assert_eq!(EE::from_str("1.989Q").unwrap().value(), 1_989_000_000_000_000_000_000_000_000_000);
+//!
+//! // [RKM code](https://en.wikipedia.org/wiki/RKM_code) style (limited to integers only)
+//! assert_eq!(EE::from_str("37k5").unwrap().value(), 37_500);
+//! assert_eq!(EE::from_str("-1M5").unwrap().value(), -1_500_000);
+//! ```
+//!
+//! ### Number to string
+//! ```
+//! use engineering_repr::EngineeringExponential as EE;
+//! use std::str::FromStr;
+//!
+//! // Default precision, 3 significant figures
+//! assert_eq!(EE::from(2345).to_string(), "2.34k");
+//! assert_eq!(EE::from(13_000).to_string(), "13.0k");
+//!
+//! // Explicit precision
+//! assert_eq!(EE::from(123_456_789).with_precision(5).to_string(), "123.45M");
+//!
+//! // RKM mode
+//! assert_eq!(EE::from(123_456).rkm_with_precision(4).to_string(), "123k4");
+//! ```
+//!
+//! ## Alternatives
+//!
+//! * [human-repr](https://crates.io/crates/human-repr) is great for converting big numbers to human-friendly representations.
+//! * [humanize-rs](https://crates.io/crates/humanize-rs) is great for converting some human-friendly representations to numbers, though engineering-repr offers more flexibility.
+
 use std::{cmp::min, fmt::Display, str::FromStr};
 
 const MAX_EXPONENT_U128: u32 = 12;
 
+/// An integer which can be expressed in engineering notation.
+///
+/// The input is retained at full precision and may be retrieved with [`EngineeringExponential::value()`].
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Default)]
 pub struct EngineeringExponential {
     significand: i128,
@@ -10,10 +64,10 @@ pub struct EngineeringExponential {
 }
 
 impl EngineeringExponential {
-    /// Standard checking constructor
+    /// Constructor with simple checks
     ///
     /// # Panics
-    /// If the exponent is guaranteed to overflow
+    /// If the exponent is guaranteed to overflow an i128
     #[must_use]
     pub fn new(significand: i128, exponent_1e3: u32) -> Self {
         assert!(exponent_1e3 <= MAX_EXPONENT_U128, "exponent would overflow");
@@ -22,6 +76,7 @@ impl EngineeringExponential {
             exponent_1e3,
         }
     }
+    /// Accessor to the raw contents of the struct
     #[must_use]
     pub fn contents(self) -> (i128, u32) {
         (self.significand, self.exponent_1e3)
@@ -46,6 +101,7 @@ impl_from_int!(u8, u16, u32, u64, i8, i16, i32, i64, i128);
 impl TryFrom<u128> for EngineeringExponential {
     type Error = EEError;
 
+    /// This conversion is checked, because it might overflow the internal representation (i128).
     fn try_from(value: u128) -> Result<Self, Self::Error> {
         let v = i128::try_from(value).map_err(|_| EEError::Overflow)?;
         Ok(Self::new(v, 1))
@@ -75,7 +131,7 @@ impl EngineeringExponential {
     #[must_use]
     /// Converting accessor
     /// # Panics
-    /// If the resultant value would be too big for an i128
+    /// If the resultant value is too big for an i128. (To avoid the panic, use [`i128::try_from()`].)
     pub fn value(&self) -> i128 {
         i128::try_from(*self).unwrap()
     }
@@ -209,6 +265,7 @@ impl Display for EngineeringExponential {
     }
 }
 
+/// A wrapper object which allows you to specify the desired output format
 #[derive(Copy, Clone, Debug)]
 pub struct DisplayAdapter<'a> {
     value: &'a EngineeringExponential,
@@ -232,19 +289,21 @@ impl Default for DisplayAdapter<'_> {
 }
 
 impl EngineeringExponential {
+    /// Creates a [`DisplayAdapter`] for this object, in standard mode, with the given precision.
     #[must_use]
-    pub fn with_precision(&self, max_sf: usize) -> DisplayAdapter<'_> {
+    pub fn with_precision(&self, max_significant_figures: usize) -> DisplayAdapter<'_> {
         DisplayAdapter {
             value: self,
-            max_significant_figures: max_sf,
+            max_significant_figures,
             rkm: false,
         }
     }
+    /// Creates a [`DisplayAdapter`] for this object, in RKM mode, with the given precision.
     #[must_use]
-    pub fn rkm_with_precision(&self, max_sf: usize) -> DisplayAdapter<'_> {
+    pub fn rkm_with_precision(&self, max_significant_figures: usize) -> DisplayAdapter<'_> {
         DisplayAdapter {
             value: self,
-            max_significant_figures: max_sf,
+            max_significant_figures,
             rkm: true,
         }
     }
@@ -285,12 +344,15 @@ impl Display for DisplayAdapter<'_> {
 /////////////////////////////////////////////////////////////////////////
 // ERRORS
 
+/// Local error type returned by failing conversions
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum EEError {
+    /// Numeric overflow
     Overflow,
-    Underflow,
+    /// The input string could not be parsed
     ParseError,
 }
+
 /////////////////////////////////////////////////////////////////////////
 
 #[cfg(test)]
