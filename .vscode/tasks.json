@@ -1,0 +1,31 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "cargo",
+			"command": "doc",
+			"args": ["--no-deps", "--locked"],
+			"problemMatcher": [
+				"$rustc"
+			],
+			"group": {
+				"kind": "build",
+				"isDefault": false
+			},
+			"label": "rust: cargo doc"
+		},
+		{
+			"type": "cargo",
+			"command": "doc",
+			"args": ["--no-deps", "--locked", "--document-private-items"],
+			"problemMatcher": [
+				"$rustc"
+			],
+			"group": {
+				"kind": "build",
+				"isDefault": false
+			},
+			"label": "rust: cargo doc --document-private-items"
+		}
+	]
+}
