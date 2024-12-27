@@ -63,7 +63,7 @@ const MAX_EXPONENT_U128: u32 = 12;
 /// An integer which can be expressed in engineering notation.
 ///
 /// The input is retained at full precision and may be retrieved with [`EngineeringExponential::value()`].
-#[derive(Debug, Clone, Copy, Eq, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct EngineeringExponential {
     significand: i128,
     /// Exponent in 10^3 i.e. 0 => 1, 1 => 1000, 2 => 10^6, etc.
@@ -91,6 +91,10 @@ impl EngineeringExponential {
 }
 
 impl PartialEq for EngineeringExponential {
+    /// ```
+    /// use engineering_repr::EngineeringExponential as EE;
+    /// assert_eq!(EE::new(1000,0), EE::new(1,1));
+    /// ```
     fn eq(&self, other: &Self) -> bool {
         // Try the easy case first
         if self.exponent_1e3 == other.exponent_1e3 {
@@ -111,6 +115,27 @@ impl PartialEq for EngineeringExponential {
             };
         // big.exponent_1e3 = small.exponent_1e3; // by definition
         big.significand == small.significand
+    }
+}
+
+impl Eq for EngineeringExponential {}
+
+impl PartialOrd for EngineeringExponential {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for EngineeringExponential {
+    /// ```
+    /// use engineering_repr::EngineeringExponential as EE;
+    /// assert!(EE::new(2,0) > EE::new(1,0));
+    /// assert!(EE::new(1,1) < EE::new(1001,0));
+    /// assert!(EE::new(1_000_001,0) > EE::new(1,2));
+    /// assert!(EE::new(1_000_001,0) > EE::new(1,2));
+    /// ```
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.value().cmp(&other.value())
     }
 }
 
