@@ -281,7 +281,7 @@ impl Display for EngineeringExponential {
     /// See [`EngineeringExponential::default()`].
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let d = DisplayAdapter {
-            value: self,
+            value: *self,
             ..Default::default()
         };
 
@@ -291,21 +291,19 @@ impl Display for EngineeringExponential {
 
 /// A wrapper object which allows you to specify the desired output format
 #[derive(Copy, Clone, Debug)]
-pub struct DisplayAdapter<'a> {
-    value: &'a EngineeringExponential,
+pub struct DisplayAdapter {
+    value: EngineeringExponential,
     max_significant_figures: usize,
     rkm: bool,
 }
 
-static DUMMY_VALUE: EngineeringExponential = EngineeringExponential {
-    significand: 0,
-    exponent_1e3: 0,
-};
-
-impl Default for DisplayAdapter<'_> {
+impl Default for DisplayAdapter {
     fn default() -> Self {
         Self {
-            value: &DUMMY_VALUE,
+            value: EngineeringExponential {
+                significand: 0,
+                exponent_1e3: 0,
+            },
             max_significant_figures: 3,
             rkm: false,
         }
@@ -315,25 +313,25 @@ impl Default for DisplayAdapter<'_> {
 impl EngineeringExponential {
     /// Creates a [`DisplayAdapter`] for this object, in standard mode, with the given precision.
     #[must_use]
-    pub fn with_precision(&self, max_significant_figures: usize) -> DisplayAdapter<'_> {
+    pub fn with_precision(&self, max_significant_figures: usize) -> DisplayAdapter {
         DisplayAdapter {
-            value: self,
+            value: *self,
             max_significant_figures,
             rkm: false,
         }
     }
     /// Creates a [`DisplayAdapter`] for this object, in RKM mode, with the given precision.
     #[must_use]
-    pub fn rkm_with_precision(&self, max_significant_figures: usize) -> DisplayAdapter<'_> {
+    pub fn rkm_with_precision(&self, max_significant_figures: usize) -> DisplayAdapter {
         DisplayAdapter {
-            value: self,
+            value: *self,
             max_significant_figures,
             rkm: true,
         }
     }
 }
 
-impl Display for DisplayAdapter<'_> {
+impl Display for DisplayAdapter {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut digits = self.value.significand.abs().to_string();
         // at first glance the output might reasonably be this value of `digits`, followed by `exponent` times "000"...
