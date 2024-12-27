@@ -44,6 +44,13 @@
 //! assert_eq!(EE::from(123_456).rkm_with_precision(4).to_string(), "123k4");
 //! ```
 //!
+//! #### Convenience traits
+//! ```
+//! use engineering_repr::EngineeringRepr as _;
+//! assert_eq!("123.4k", 123456.to_eng(4));
+//! assert_eq!("123k4", 123456.to_rkm(4));
+//! ```
+//!
 //! ## Alternatives
 //!
 //! * [human-repr](https://crates.io/crates/human-repr) is great for converting big numbers to human-friendly representations.
@@ -285,12 +292,11 @@ impl Display for EngineeringExponential {
     /// Standard precision is defined as 3 significant figures, standard (not RKM) mode.
     /// See [`EngineeringExponential::default()`].
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let d = DisplayAdapter {
+        DisplayAdapter {
             value: *self,
             ..Default::default()
-        };
-
-        d.fmt(f)
+        }
+        .fmt(f)
     }
 }
 
@@ -312,6 +318,25 @@ impl Default for DisplayAdapter {
             max_significant_figures: 3,
             rkm: false,
         }
+    }
+}
+
+impl PartialEq for DisplayAdapter {
+    fn eq(&self, other: &Self) -> bool {
+        self.value.value() == other.value.value()
+    }
+}
+
+impl PartialEq<DisplayAdapter> for &str {
+    fn eq(&self, other: &DisplayAdapter) -> bool {
+        other == self
+    }
+}
+
+impl PartialEq<&str> for DisplayAdapter {
+    #[allow(clippy::cmp_owned)]
+    fn eq(&self, other: &&str) -> bool {
+        *other == self.to_string()
     }
 }
 
@@ -379,6 +404,44 @@ pub enum EEError {
     /// The input string could not be parsed
     ParseError,
 }
+
+/////////////////////////////////////////////////////////////////////////
+// CONVENIENCE TRAITS
+
+/// Convenience trait for outputting numbers directly in engineering notation
+pub trait EngineeringRepr {
+    /// Outputs a number in engineering notation
+    /// ```
+    /// use engineering_repr::EngineeringRepr as _;
+    /// assert_eq!("123k", 123456.to_eng(3));
+    /// assert_eq!("123.4k", 123456.to_eng(4));
+    /// ```
+    fn to_eng(self, sig_figures: usize) -> DisplayAdapter;
+    /// Outputs a number in RKM notation
+    /// ```
+    /// use engineering_repr::EngineeringRepr as _;
+    /// assert_eq!("123k", 123456.to_rkm(3));
+    /// assert_eq!("123k4", 123456.to_rkm(4));
+    /// ```
+    fn to_rkm(self, sig_figures: usize) -> DisplayAdapter;
+}
+
+macro_rules! impl_to_eng {
+    {$($t:ty),+} => {$(
+        impl EngineeringRepr for $t {
+            fn to_eng(self, sig_figures: usize) -> DisplayAdapter
+            {
+                EngineeringExponential::try_from(self).unwrap().with_precision(sig_figures)
+            }
+            fn to_rkm(self, sig_figures: usize) -> DisplayAdapter
+            {
+                EngineeringExponential::try_from(self).unwrap().rkm_with_precision(sig_figures)
+            }
+        }
+    )+}
+}
+
+impl_to_eng!(u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize);
 
 /////////////////////////////////////////////////////////////////////////
 
