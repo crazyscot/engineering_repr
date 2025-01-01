@@ -104,7 +104,7 @@ impl<T: EQSupported<T> + FromStr> FromStr for EngineeringQuantity<T> {
                 exponent -= whole_groups + 1;
                 to_convert.push('0');
             }
-            3.. => panic!("impossible"),
+            3.. => panic!("impossible"), // coverage cannot reach this line
         }
         if exponent < 0 {
             return Err(Error::ParseError);
@@ -174,20 +174,8 @@ impl<T: EQSupported<T>> Default for DisplayAdapter<T> {
     }
 }
 
-impl<T: EQSupported<T> + TryFrom<EngineeringQuantity<T>>> PartialEq for DisplayAdapter<T> {
-    fn eq(&self, other: &Self) -> bool {
-        self.value == other.value
-    }
-}
-
-impl<T: EQSupported<T>> PartialEq<&str> for DisplayAdapter<T> {
-    #[allow(clippy::cmp_owned)]
-    fn eq(&self, s: &&str) -> bool {
-        *s == self.to_string()
-    }
-}
-
 impl<T: EQSupported<T>> PartialEq<DisplayAdapter<T>> for &str {
+    /// This is intended for use in tests.
     #[allow(clippy::cmp_owned)]
     fn eq(&self, other: &DisplayAdapter<T>) -> bool {
         *self == other.to_string()
@@ -343,6 +331,12 @@ mod test {
             (1_000_000, "1M0"),
             (2_345_678, "2M345678"),
             (999_999_999, "999M999999"),
+            (1_000_000_000, "1G0"),
+            (1_000_000_000_000, "1T0"),
+            (1_000_000_000_000_000, "1P0"),
+            (1_000_000_000_000_000_000, "1E0"),
+            (1_000_000_000_000_000_000_000, "1Z0"),
+            (1_000_000_000_000_000_000_000_000, "1Y0"),
             (12_345_000_000_000_000_000_000_000_000, "12R345"), // I wonder if 1R means 1 ohm or 1 ronnaohm? :-)
             (12_345_000_000_000_000_000_000_000_000_000, "12Q345"),
         ] {

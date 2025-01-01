@@ -26,7 +26,6 @@ pub struct EngineeringQuantity<T: EQSupported<T>> {
 // META (SUPPORTED STORAGE TYPES)
 
 /// Marker trait indicating that a type is supported as a storage type for [`EngineeringQuantity`].
-/// [`SignHelper<T>`] is a form of the Curiously Recursive pattern.
 pub trait EQSupported<T: PrimInt>: PrimInt + std::fmt::Display + ConstZero + SignHelper<T> {
     /// Always 1000 (used internally)
     const EXPONENT_BASE: T;
@@ -303,10 +302,22 @@ mod test {
     }
 
     #[test]
+    fn conversion() {
+        let t = EQ::<u32>::from_raw(12345, 0);
+        let u = t.convert::<u64>();
+        assert_eq!(u.to_raw().0, t.to_raw().0.into());
+        assert_eq!(t.to_raw().1, u.to_raw().1);
+    }
+
+    #[test]
     fn overflow() {
         let t = EQ::<u32>::from_raw(100_000, 0);
         let _ = t.try_convert::<u16>().expect_err("TryFromIntError");
         assert_eq!(u16::try_from(t), Err(EQErr::Overflow));
+
+        // 10^15 is too big for a u32, so will overflow on conversion to integer:
+        let t = EQ::<u32>::from_raw(1, 5);
+        assert_eq!(u64::try_from(t), Err(EQErr::Overflow));
     }
     #[test]
     fn underflow() {
