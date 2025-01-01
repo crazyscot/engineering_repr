@@ -1,7 +1,7 @@
 [![Crates.io](https://img.shields.io/crates/v/engineering_repr.svg)](https://crates.io/crates/engineering_repr)
 ![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/crazyscot/engineering_repr)
 [![Build status](https://github.com/crazyscot/engineering_repr/actions/workflows/rust.yml/badge.svg)](https://github.com/crazyscot/engineering_repr/actions/workflows/rust.yml)
-[![Documentation](https://docs.rs/engineering_repr/badge.svg)](https://docs.rs/engineering_repr/)
+[![Documentation](https://img.shields.io/docsrs/engineering-repr)](https://docs.rs/engineering_repr/)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 [![Coverage](https://img.shields.io/coverallsCoverage/github/crazyscot/engineering_repr)](https://coveralls.io/github/crazyscot/engineering_repr)
 
