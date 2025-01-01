@@ -11,8 +11,7 @@ impl<T: EQSupported<T>> Serialize for EngineeringQuantity<T> {
     where
         S: serde::Serializer,
     {
-        // TODO: better precision, perhaps automatic?
-        let s = self.to_string();
+        let s = self.with_precision(0).to_string();
         serializer.serialize_str(&s)
     }
 }
@@ -55,8 +54,8 @@ mod test {
     use crate::EngineeringQuantity as EQ;
 
     #[test]
-    fn serde() {
-        let e1 = EQ::from_raw(42, 2);
+    fn pairwise_precision() {
+        let e1 = EQ::from_raw(1_234_567, 2);
         let json = serde_json::to_string(&e1).unwrap();
         println!("{json}");
         let e2 = serde_json::from_str(&json).unwrap();

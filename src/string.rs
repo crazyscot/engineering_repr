@@ -155,7 +155,7 @@ where
 {
     /// The value to be displayed
     pub value: EngineeringQuantity<T>,
-    /// The precision at which to display
+    /// The precision at which to display, or 0 to work it out losslessly
     pub max_significant_figures: usize,
     /// Specifies [RKM code](https://en.wikipedia.org/wiki/RKM_code) mode
     pub rkm: bool,
@@ -230,15 +230,27 @@ impl<T: EQSupported<T>> Display for DisplayAdapter<T> {
         let output_exponent = (digits.len() - 1) / 3;
         let si = exponent_to_multiplier(output_exponent);
         let leading = digits.len() - output_exponent * 3;
+
+        let precision = match self.max_significant_figures {
+            0 => usize::MAX, // automatic mode: take all the digits, we'll trim trailing 0s in a moment
+            i => i,
+        };
         let trailing = min(
+            // number of digits remaining
             digits.len() - leading,
-            self.max_significant_figures - min(self.max_significant_figures, leading),
+            // number of digits we'd take to reach the requested number of s.f.
+            precision - min(precision, leading),
         );
         let leaders = &digits[0..leading];
-        let trailers = &digits[leading..leading + min(trailing, self.max_significant_figures)];
+        let mut trailers = &digits[leading..leading + min(trailing, precision)];
+        if precision == usize::MAX {
+            while trailers.ends_with('0') {
+                trailers = &trailers[0..trailers.len() - 1];
+            }
+        }
         let mid = if self.rkm {
             si
-        } else if self.max_significant_figures == 0 || trailers.is_empty() {
+        } else if trailers.is_empty() {
             ""
         } else {
             "."
@@ -257,20 +269,26 @@ impl<T: EQSupported<T>> Display for DisplayAdapter<T> {
 /// directly in a formatting macro.
 pub trait EngineeringRepr<T: EQSupported<T>> {
     /// Outputs a number in engineering notation
+    ///
+    /// A request for 0 significant figures outputs exactly as many digits are necessary to maintain precision.
     /// ```
     /// use engineering_repr::EngineeringRepr as _;
     /// assert_eq!("123k", 123456.to_eng(3));
     /// assert_eq!("123.4k", 123456.to_eng(4));
+    /// assert_eq!("123.456k", 123456.to_eng(0));
     /// ```
     /// # Panics
     /// If the value could not be rendered
     fn to_eng(self, sig_figures: usize) -> DisplayAdapter<T>;
 
     /// Outputs a number in RKM notation
+    ///
+    /// A request for 0 significant figures outputs exactly as many digits are necessary to maintain precision.
     /// ```
     /// use engineering_repr::EngineeringRepr as _;
     /// assert_eq!("123k", 123456.to_rkm(3));
     /// assert_eq!("123k4", 123456.to_rkm(4));
+    /// assert_eq!("123k456", 123456.to_rkm(0));
     /// ```
     /// # Panics
     /// If the value could not be rendered
@@ -449,5 +467,34 @@ mod test {
         let e2 = EQ::from_raw(1u16, -1);
         assert_ne!(e, e2);
         assert!(e2.to_string().contains("underflow"));
+    }
+
+    #[test]
+    fn auto_precision() {
+        for (i, s) in &[
+            (1i128, "1"),
+            (42, "42"),
+            (100, "100"),
+            (999, "999"),
+            (1000, "1k"),
+            (1500, "1.5k"),
+            (2345, "2.345k"),
+            (9999, "9.999k"),
+            (12_345, "12.345k"),
+            (13_000, "13k"),
+            (999_999, "999.999k"),
+            (1_000_000, "1M"),
+            (2_345_678, "2.345678M"),
+            (999_999_999, "999.999999M"),
+            (12_345_600_000_000_000_000_000_000_000, "12.3456R"),
+            (12_345_600_000_000_000_000_000_000_000_000, "12.3456Q"),
+        ] {
+            let ee = EQ::<i128>::from(*i);
+            assert_eq!(ee.with_precision(0).to_string(), *s, "input={}", *i);
+            let ee2 = EQ::<i128>::from(-*i);
+            let ss2 = ee2.with_precision(0).to_string();
+            assert_eq!(ss2.chars().next().unwrap(), '-');
+            assert_eq!(&ss2[1..], *s, "input={}", -*i);
+        }
     }
 }
