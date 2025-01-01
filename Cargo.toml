@@ -1,9 +1,14 @@
 [package]
 name = "engineering-repr"
+description = "Numeric conversions for engineering notation (1.23k) and the RKM code variant (1k23)"
 version = "0.1.0"
 edition = "2021"
 authors = ["Ross Younger <qcp@crazyscot.com>"]
 license = "MIT"
+repository = "https://github.com/crazyscot/engineering_repr/"
+homepage = "https://github.com/crazyscot/engineering_repr/"
+keywords = ["human", "engineering", "notation", "numbers", "configuration"]
+categories = ["parsing", "mathematics"]
 
 [dependencies]
 num-rational = { version = "0.4.2", default-features = false }
