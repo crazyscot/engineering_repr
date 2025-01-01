@@ -9,6 +9,8 @@ use num_traits::{checked_pow, ConstZero, PrimInt};
 mod string;
 pub use string::{DisplayAdapter, EngineeringRepr};
 
+mod serde_support;
+
 /// Helper type for expressing numbers in engineering notation
 ///
 /// # Type parameter
@@ -305,7 +307,7 @@ mod test {
     fn conversion() {
         let t = EQ::<u32>::from_raw(12345, 0);
         let u = t.convert::<u64>();
-        assert_eq!(u.to_raw().0, t.to_raw().0.into());
+        assert_eq!(u.to_raw().0, <u32 as Into<u64>>::into(t.to_raw().0));
         assert_eq!(t.to_raw().1, u.to_raw().1);
     }
 
