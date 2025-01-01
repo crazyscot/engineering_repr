@@ -1,2 +1,2 @@
-types-v0.1.dot.png: types-v0.1.dot
-	dot $< -O -Tpng
+types-v0.1.dot.svg: types-v0.1.dot
+	dot $< -O -Tsvg
