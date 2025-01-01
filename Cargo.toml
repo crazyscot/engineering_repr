@@ -6,8 +6,8 @@ authors = ["Ross Younger <qcp@crazyscot.com>"]
 license = "MIT"
 
 [dependencies]
-num-traits = "0.2"
-
+num-rational = { version = "0.4.2", default-features = false }
+num-traits = { version = "0.2.19", default-features = false }
 
 [lints.rust]
 dead_code = "warn"
@@ -16,7 +16,7 @@ meta_variable_misuse = "deny"
 missing_abi = "deny"
 missing_copy_implementations = "deny"
 missing_debug_implementations = "deny"
-#missing_docs = "warn"
+missing_docs = "warn"
 non_ascii_idents = "deny"
 single_use_lifetimes = "deny"
 trivial_casts = "deny"
@@ -43,3 +43,6 @@ invalid_rust_codeblocks = "deny"
 missing_crate_level_docs = "deny"
 private_intra_doc_links = "deny"
 unescaped_backticks = "deny"
+
+[dev-dependencies]
+more-asserts = "0.3.1"
