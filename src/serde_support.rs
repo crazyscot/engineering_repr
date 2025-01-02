@@ -55,10 +55,15 @@ mod test {
 
     #[test]
     fn pairwise_precision() {
-        let e1 = EQ::from_raw(1_234_567, 2);
+        let e1 = EQ::from_raw(1_234, 2).unwrap();
         let json = serde_json::to_string(&e1).unwrap();
         println!("{json}");
         let e2 = serde_json::from_str(&json).unwrap();
         assert_eq!(e1, e2);
+    }
+
+    #[test]
+    fn type_mismatch() {
+        let _ = serde_json::from_str::<EQ<i32>>("false").expect_err("type mismatch");
     }
 }

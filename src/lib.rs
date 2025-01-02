@@ -10,7 +10,7 @@
 
 use std::cmp::Ordering;
 
-use num_traits::{checked_pow, ConstZero, PrimInt};
+use num_traits::{checked_pow, ConstZero, PrimInt, ToPrimitive};
 
 mod string;
 pub use string::{DisplayAdapter, EngineeringRepr};
@@ -35,7 +35,16 @@ pub struct EngineeringQuantity<T: EQSupported<T>> {
 // META (SUPPORTED STORAGE TYPES)
 
 /// Marker trait indicating that a type is supported as a storage type for [`EngineeringQuantity`].
-pub trait EQSupported<T: PrimInt>: PrimInt + std::fmt::Display + ConstZero + SignHelper<T> {
+pub trait EQSupported<T: PrimInt>:
+    PrimInt
+    + std::fmt::Display
+    + ConstZero
+    + SignHelper<T>
+    + TryInto<i64>
+    + TryInto<i128>
+    + TryInto<u64>
+    + TryInto<u128>
+{
     /// Always 1000 (used internally)
     const EXPONENT_BASE: T;
 }
@@ -58,8 +67,9 @@ pub struct AbsAndSign<T: PrimInt> {
 }
 
 /// Signedness helper trait, used by string conversions.
-/// This trait exists because `abs()` is, quite reasonably, only implemented
-/// for types which are `num_traits::Signed`.
+///
+/// This trait exists because `abs` is, quite reasonably, only implemented
+/// for types which impl [`num_traits::Signed`].
 pub trait SignHelper<T: PrimInt> {
     /// Unpacks a maybe-signed integer into its absolute value and sign bit
     fn abs_and_sign(&self) -> AbsAndSign<T>;
@@ -94,23 +104,28 @@ impl_signed_helpers!(i16, i32, i64, i128, isize);
 // Constructors & accessors
 impl<T: EQSupported<T>> EngineeringQuantity<T> {
     /// Raw constructor from component parts
-    #[must_use]
-    pub fn from_raw(significand: T, exponent: i8) -> Self {
-        Self {
-            significand,
-            exponent,
-        }
+    ///
+    /// Construction fails if the number would overflow the storage type `T`.
+    pub fn from_raw(significand: T, exponent: i8) -> Result<Self, Error> {
+        Self::from_raw_unchecked(significand, exponent).check_for_int_overflow()
     }
     /// Raw accessor to retrieve the component parts
     #[must_use]
     pub fn to_raw(self) -> (T, i8) {
         (self.significand, self.exponent)
     }
+    /// Internal raw constructor
+    fn from_raw_unchecked(significand: T, exponent: i8) -> Self {
+        Self {
+            significand,
+            exponent,
+        }
+    }
 }
 
 // Comparisons
 
-impl<T: EQSupported<T> + TryFrom<EngineeringQuantity<T>>> PartialEq for EngineeringQuantity<T> {
+impl<T: EQSupported<T> + From<EngineeringQuantity<T>>> PartialEq for EngineeringQuantity<T> {
     /// ```
     /// use engineering_repr::EngineeringQuantity as EQ;
     /// let q1 = EQ::from_raw(42u32,0);
@@ -130,23 +145,28 @@ impl<T: EQSupported<T> + TryFrom<EngineeringQuantity<T>>> PartialEq for Engineer
     }
 }
 
-impl<T: EQSupported<T> + TryFrom<EngineeringQuantity<T>>> PartialOrd for EngineeringQuantity<T> {
+impl<T: EQSupported<T> + From<EngineeringQuantity<T>>> Eq for EngineeringQuantity<T> {}
+
+impl<T: EQSupported<T> + From<EngineeringQuantity<T>>> PartialOrd for EngineeringQuantity<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<T: EQSupported<T> + From<EngineeringQuantity<T>>> Ord for EngineeringQuantity<T> {
     /// ```
     /// use engineering_repr::EngineeringQuantity as EQ;
     /// use more_asserts::assert_lt;
-    /// let q2 = EQ::from_raw(41999,0);
-    /// let q3 = EQ::from_raw(42,1);
-    /// let q4 = EQ::from_raw(42001,0);
+    /// let q2 = EQ::from_raw(41999,0).unwrap();
+    /// let q3 = EQ::from_raw(42,1).unwrap();
+    /// let q4 = EQ::from_raw(42001,0).unwrap();
     /// assert_lt!(q2, q3);
     /// assert_lt!(q3, q4);
     /// ```
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        let v1 = T::try_from(*self);
-        let v2 = T::try_from(*other);
-        match (v1, v2) {
-            (Ok(vv1), Ok(vv2)) => Some(vv1.cmp(&vv2)),
-            _ => None,
-        }
+    fn cmp(&self, other: &Self) -> Ordering {
+        let v1 = <T as From<EngineeringQuantity<T>>>::from(*self);
+        let v2 = <T as From<EngineeringQuantity<T>>>::from(*other);
+        v1.cmp(&v2)
     }
 }
 
@@ -157,33 +177,29 @@ impl<T: EQSupported<T>> EngineeringQuantity<T> {
     /// then you can convert from `EngineeringQuantity<A>` to `EngineeringQuantity<B>`.
     /// ```
     /// use engineering_repr::EngineeringQuantity as EQ;
-    /// let q = EQ::from_raw(42u32, 0);
+    /// let q = EQ::from_raw(42u32, 0).unwrap();
     /// let q2 = q.convert::<u64>();
     /// assert_eq!(q2.to_raw(), (42u64, 0));
     /// ```
     pub fn convert<U: EQSupported<U> + From<T>>(&self) -> EngineeringQuantity<U> {
         let (sig, exp) = self.to_raw();
-        EngineeringQuantity::<U>::from_raw(sig.into(), exp)
+        EngineeringQuantity::<U>::from_raw_unchecked(sig.into(), exp)
     }
 
     /// Fallible conversion to a different storage type.
     ///
-    /// Note that conversion only fails if the significand doesn't fit into the destination storage type,
-    /// without reference to the exponent. This means that two numbers, which might be equal, may not both
-    /// be convertible to the same destination type if they are not normalised. For example:
+    /// Conversion fails if the number cannot be represented in the the destination storage type.
     /// ```
-    /// use engineering_repr::EngineeringQuantity as EQ;
-    /// let million1 = EQ::from_raw(1, 2); // 1e6
-    /// let million2 = EQ::from_raw(1_000_000, 0);
-    /// assert_eq!(million1, million2);
-    /// let r1 = million1.try_convert::<u16>().unwrap(); // OK, because stored as (1,2)
-    /// let r2 = million2.try_convert::<u16>().expect_err("overflow"); // Overflow, because 1_000_000 won't fit into a u16
+    /// type EQ = engineering_repr::EngineeringQuantity<u32>;
+    /// let million = EQ::from_raw(1, 2).unwrap();
+    /// let r1 = million.try_convert::<u32>().unwrap();
+    /// let r2 = million.try_convert::<u16>().expect_err("overflow"); // Overflow, because 1_000_000 won't fit into a u16
     /// ```
     pub fn try_convert<U: EQSupported<U> + TryFrom<T>>(
         &self,
-    ) -> Result<EngineeringQuantity<U>, <U as std::convert::TryFrom<T>>::Error> {
+    ) -> Result<EngineeringQuantity<U>, Error> {
         let (sig, exp) = self.to_raw();
-        Ok(EngineeringQuantity::<U>::from_raw(sig.try_into()?, exp))
+        EngineeringQuantity::<U>::from_raw(sig.try_into().map_err(|_| Error::Overflow)?, exp)
     }
 }
 
@@ -231,36 +247,102 @@ where
 /////////////////////////////////////////////////////////////////////////
 // CONVERSION TO INTEGER
 
-macro_rules! impl_try_from {
+impl<T: EQSupported<T>> EngineeringQuantity<T> {
+    fn check_for_int_overflow(self) -> Result<Self, Error> {
+        if self.exponent < 0 {
+            // This function does NOT trap underflow.
+            return Ok(self);
+        }
+        let exp: usize = self.exponent.unsigned_abs().into();
+        let Some(factor) = checked_pow(T::EXPONENT_BASE, exp) else {
+            return Err(Error::Overflow);
+        };
+        let result: T = factor * self.significand;
+        let _ = std::convert::TryInto::<T>::try_into(result).map_err(|_| Error::Overflow)?;
+        Ok(self)
+    }
+}
+
+macro_rules! impl_from {
     {$($t:ty),+} => {$(
-        impl<U: EQSupported<U>> TryFrom<EngineeringQuantity<U>> for $t
-        where $t: TryFrom<U>,
+        impl<T: EQSupported<T>> From<EngineeringQuantity<T>> for $t
+        where $t: From<T>,
         {
-            type Error = crate::Error;
             #[doc = concat!("\
-Conversion to integer is always fallible, as the exponent might cause us to under or overflow.
-```
-use engineering_repr::EngineeringQuantity;
-use engineering_repr::Error as EErr;
-let i = EngineeringQuantity::<u32>::from_raw(11, 1);
-assert_eq!(", stringify!($t), "::try_from(i).unwrap(), 11000);
-```
+Conversion to the same storage type (or a larger type)
+is infallible due to the checks at construction time.
 ")]
-            fn try_from(eq: EngineeringQuantity<U>) -> Result<Self, Error> {
-                // TODO: This conversion fails on negative exponents
-                let exp: usize = eq.exponent.try_into().map_err(|_| Error::Underflow)?;
-                let Some(factor) = checked_pow(U::EXPONENT_BASE, exp) else {
-                    return Err(Error::Overflow);
-                };
-                let result: U = factor * eq.significand;
-                std::convert::TryInto::<$t>::try_into(result).map_err(|_| Error::Overflow)
+            fn from(eq: EngineeringQuantity<T>) -> Self {
+                let abs_exp: usize = eq.exponent.unsigned_abs().into();
+                let factor: Self = num_traits::pow(T::EXPONENT_BASE.into(), abs_exp);
+                if eq.exponent > 0 {
+                    Self::from(eq.significand) * factor
+                } else {
+                    Self::from(eq.significand) / factor
+                }
             }
         }
 
     )+}
 }
 
-impl_try_from!(u16, u32, u64, u128, usize, i16, i32, i64, i128, isize);
+impl_from!(u16, u32, u64, u128, usize, i16, i32, i64, i128, isize);
+
+impl<T: EQSupported<T>> EngineeringQuantity<T> {
+    fn apply_factor<U: EQSupported<U>>(self, sig: U) -> U {
+        let abs_exp: usize = self.exponent.unsigned_abs().into();
+        let factor: U = num_traits::pow(U::EXPONENT_BASE, abs_exp);
+        if self.exponent >= 0 {
+            sig * factor
+        } else {
+            sig / factor
+        }
+    }
+}
+
+impl<T: EQSupported<T>> ToPrimitive for EngineeringQuantity<T> {
+    /// ```
+    /// use num_traits::cast::ToPrimitive as _;
+    /// let e = engineering_repr::EngineeringQuantity::<u32>::from(65_537u32);
+    /// assert_eq!(e.to_u128(), Some(65_537));
+    /// assert_eq!(e.to_u64(), Some(65_537));
+    /// assert_eq!(e.to_u16(), None); // overflow
+    /// assert_eq!(e.to_i128(), Some(65_537));
+    /// assert_eq!(e.to_i64(), Some(65_537));
+    /// assert_eq!(e.to_i16(), None); // overflow
+    /// ```
+    fn to_i64(&self) -> Option<i64> {
+        let i: i64 = match self.significand.try_into() {
+            Ok(ii) => ii,
+            Err(_) => return None,
+        };
+        Some(self.apply_factor(i))
+    }
+
+    fn to_u64(&self) -> Option<u64> {
+        let i: u64 = match self.significand.try_into() {
+            Ok(ii) => ii,
+            Err(_) => return None,
+        };
+        Some(self.apply_factor(i))
+    }
+
+    fn to_i128(&self) -> Option<i128> {
+        let i: i128 = match self.significand.try_into() {
+            Ok(ii) => ii,
+            Err(_) => return None,
+        };
+        Some(self.apply_factor(i))
+    }
+
+    fn to_u128(&self) -> Option<u128> {
+        let i: u128 = match self.significand.try_into() {
+            Ok(ii) => ii,
+            Err(_) => return None,
+        };
+        Some(self.apply_factor(i))
+    }
+}
 
 /////////////////////////////////////////////////////////////////////////
 // ERRORS
@@ -287,10 +369,10 @@ mod test {
     #[test]
     fn integers() {
         for i in &[1i64, -1, 100, -100, 1000, 4000, -4000, 4_000_000] {
-            let ee = EQ::from_raw(*i, 0);
-            assert_eq!(i64::try_from(ee).unwrap(), *i);
-            let ee2 = EQ::from_raw(*i, 1);
-            assert_eq!(i64::try_from(ee2).unwrap(), *i * 1000, "input is {}", *i);
+            let ee = EQ::from_raw(*i, 0).unwrap();
+            assert_eq!(i64::from(ee), *i);
+            let ee2 = EQ::from_raw(*i, 1).unwrap();
+            assert_eq!(i64::from(ee2), *i * 1000, "input is {}", *i);
         }
     }
 
@@ -313,7 +395,7 @@ mod test {
 
     #[test]
     fn conversion() {
-        let t = EQ::<u32>::from_raw(12345, 0);
+        let t = EQ::<u32>::from_raw(12345, 0).unwrap();
         let u = t.convert::<u64>();
         assert_eq!(u.to_raw().0, <u32 as Into<u64>>::into(t.to_raw().0));
         assert_eq!(t.to_raw().1, u.to_raw().1);
@@ -321,25 +403,56 @@ mod test {
 
     #[test]
     fn overflow() {
-        let t = EQ::<u32>::from_raw(100_000, 0);
+        let t = EQ::<u32>::from_raw(100_000, 0).unwrap();
         let _ = t.try_convert::<u16>().expect_err("TryFromIntError");
-        assert_eq!(u16::try_from(t), Err(EQErr::Overflow));
 
-        // 10^15 is too big for a u32, so will overflow on conversion to integer:
-        let t = EQ::<u32>::from_raw(1, 5);
-        assert_eq!(u64::try_from(t), Err(EQErr::Overflow));
-    }
-    #[test]
-    fn underflow() {
-        let t = EQ::<u32>::from_raw(1, -1);
-        assert_eq!(u32::try_from(t), Err(EQErr::Underflow));
+        // 10^15 is too big for a u32, so will overflow:
+        assert_eq!(EQ::<u32>::from_raw(1, 5), Err(EQErr::Overflow));
     }
 
     #[test]
     fn normalise() {
-        let q = EQ::from_raw(1_000_000, 0);
+        let q = EQ::from_raw(1_000_000, 0).unwrap();
         let q2 = q.normalise();
         assert_eq!(q, q2);
         assert_eq!(q2.to_raw(), (1, 2));
+    }
+
+    #[test]
+    fn to_primitive() {
+        use num_traits::ToPrimitive as _;
+        let e = EQ::<i128>::from_raw(1234, 0).unwrap();
+        assert_eq!(e.to_i8(), None);
+        assert_eq!(e.to_i16(), Some(1234));
+        assert_eq!(e.to_i32(), Some(1234));
+        assert_eq!(e.to_i64(), Some(1234));
+        assert_eq!(e.to_i128(), Some(1234));
+        assert_eq!(e.to_isize(), Some(1234));
+        assert_eq!(e.to_u8(), None);
+        assert_eq!(e.to_u16(), Some(1234));
+        assert_eq!(e.to_u32(), Some(1234));
+        assert_eq!(e.to_u64(), Some(1234));
+        assert_eq!(e.to_u128(), Some(1234));
+        assert_eq!(e.to_usize(), Some(1234));
+
+        // negatives cannot fit into an unsigned
+        let e = EQ::<i128>::from_raw(-1, 0).unwrap();
+        assert_eq!(e.to_u64(), None);
+        assert_eq!(e.to_u128(), None);
+
+        // positives which would overflow
+        let e = EQ::<u128>::from_raw(u128::MAX, 0).unwrap();
+        assert_eq!(e.to_i64(), None);
+        assert_eq!(e.to_i128(), None);
+
+        // rounding toward zero
+        let e = EQ::from_raw(1, -1).unwrap();
+        assert_eq!(e.to_i32(), Some(0));
+        let e = EQ::from_raw(1001, -1).unwrap();
+        assert_eq!(e.to_i32(), Some(1));
+        let e = EQ::from_raw(-1, -1).unwrap();
+        assert_eq!(e.to_i32(), Some(0));
+        let e = EQ::from_raw(-1001, -1).unwrap();
+        assert_eq!(e.to_i32(), Some(-1));
     }
 }

@@ -10,8 +10,9 @@ digraph "types" {
     }
     subgraph cluster_ints {
         graph [penwidth=0]
-        from_ints [label = "integer types\n(where Into<T>)"]
-        into_int [label = "integers\n(i16/u16 or larger)"]
+        from_ints [label = "integer types\n(T or smaller)"]
+        into_int [label = "integers\n(T or larger)"]
+        tuple
     }
     str [label = "String"];
     tuple [label = "raw tuple\n(T, i8)"];
@@ -19,9 +20,10 @@ digraph "types" {
     str -> EE [label="FromStr"];
     EE -> str [label="Display"];
     from_ints -> EE [label="From"];
-    tuple -> EE [label="From", dir="both"]
+    EE -> tuple [label="From"]
+    tuple -> EE [label="TryFrom"]
 
-    EE -> into_int [label="TryFrom"]
+    EE -> into_int [label="From"]
 
     EE -> DA [label="(configurable\nformat)"];
     into_int -> ER_trait [label="  impl" style=dashed];
