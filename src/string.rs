@@ -61,11 +61,11 @@ impl<T: EQSupported<T> + FromStr> FromStr for EngineeringQuantity<T> {
             // Easy case: direct integer conversion.
             // There had better not be a decimal point as that would imply a non-integer!
             return T::from_str(s)
-                .map(|i| EngineeringQuantity::from_raw(i, 0))
-                .map_err(|_| Error::ParseError);
+                .map_err(|_| Error::ParseError)
+                .and_then(|i| EngineeringQuantity::from_raw(i, 0));
         };
 
-        // Is there a decimal? If so it's RKM mode.
+        // Is there a decimal? If so it's standard (non RKM) mode.
         let decimal = s.find('.');
 
         let split_index = if let Some(d) = decimal {
@@ -116,7 +116,7 @@ impl<T: EQSupported<T> + FromStr> FromStr for EngineeringQuantity<T> {
             clippy::cast_possible_wrap,
             clippy::cast_sign_loss
         )]
-        Ok(Self::from_raw(significand, exponent))
+        Self::from_raw(significand, exponent)
     }
 }
 
@@ -359,13 +359,13 @@ mod test {
             (12_345_000_000_000_000_000_000_000_000_000, "12Q345"),
         ] {
             let eq = EQ::<i128>::from_str(s).unwrap();
-            let result = i128::try_from(eq).unwrap();
+            let result = i128::from(eq);
             assert_eq!(result, *i, "input {s} expected {i}");
             let mut str2 = String::with_capacity(1 + s.len());
             str2.push('-');
             str2.push_str(s);
             let ee2 = EQ::<i128>::from_str(&str2).unwrap();
-            assert_eq!(i128::try_from(ee2).unwrap(), -*i);
+            assert_eq!(i128::from(ee2), -*i);
         }
     }
 
@@ -447,15 +447,15 @@ mod test {
             (1000, 0, "1.00k"),
             (1000, 1, "1.00M"),
         ] {
-            let e = EQ::<i128>::from_raw(*sig, *exp);
+            let e = EQ::<i128>::from_raw(*sig, *exp).unwrap();
             assert_eq!(e.to_string(), *str, "test case: {sig},{exp} -> {str}");
         }
     }
 
     #[test]
     fn overflow() {
-        let e = EQ::from_raw(1u16, 0);
-        let e2 = EQ::from_raw(1u16, 1);
+        let e = EQ::from_raw(1u16, 0).unwrap();
+        let e2 = EQ::from_raw(1u16, 1).unwrap();
         assert_ne!(e, e2);
         println!("{e:?} -> {e}");
         println!("{e2:?} -> {e2}");
@@ -463,8 +463,8 @@ mod test {
     }
     #[test]
     fn underflow() {
-        let e = EQ::from_raw(1u16, 0);
-        let e2 = EQ::from_raw(1u16, -1);
+        let e = EQ::from_raw(1u16, 0).unwrap();
+        let e2 = EQ::from_raw(1u16, -1).unwrap();
         assert_ne!(e, e2);
         assert!(e2.to_string().contains("underflow"));
     }

@@ -32,7 +32,7 @@ The intended use case is reading user-entered strings from configuration files.
 
 ## Detail
 
-This crate is centred around the [`EngineeringQuantity`]`<T>` type.
+This crate is centred around the `EngineeringQuantity<T>` type.
 
 * The generic parameter `T` specifies the storage type to use for the significand.
   This can be any primitive integer except for `i8` or `u8`.
@@ -40,29 +40,29 @@ This crate is centred around the [`EngineeringQuantity`]`<T>` type.
 * The exponent is always stored as an `i8`.
 
 You can convert an `EngineeringQuantity` to:
-* most primitive integer types (not `i8` or `u8`)
-* String, directly by [`std::fmt::Display`], or via the [`DisplayAdapter`] type for control over the output.
-* its component parts, as a tuple `(<StorageT>, i8)` (see [`to_raw`](EngineeringQuantity::to_raw))
-* another `EngineeringQuantity` of a different storage type
+* type `T`, or a larger integer type (one which implements `From<T>`)
+* String, optionally via the `DisplayAdapter` type for control over the output.
+* its component parts, as a tuple `(<T>, i8)` (see `to_raw`)
+* another `EngineeringQuantity` of a larger storage type (see `convert`; the new type must implement `From<T>`)
 
 You can create an `EngineeringQuantity` from:
-* most primitive integer types (not `i8` or `u8`)
-* `&str`, by [`FromStr`](core::str::FromStr)
-  * this autodetects both standard and RKM code variants
-* its component parts `(<StorageT>, i8)` (see [`from_raw`](EngineeringQuantity::from_raw)).
+* type `T`, or a smaller integer type (one which implements `Into<T>`)
+* String or `&str`, which autodetects both standard and RKM code variants
+* its component parts `(<T>, i8)` (see `from_raw`)
+  * N.B. this applies an overflow check; it will fail if the number cannot fit into `T`.
 
-Primitive integers may be converted directly to string via the `EngineeringRepr` convenience trait.
+Primitive types may be converted directly to string via the `EngineeringRepr` convenience trait.
 
 Or, if you prefer, here are the type relations in diagram form:
 
 ```text
     ╭─────────────────────╮    ╭─────────────────────╮    ╭───────────╮
     │      integers       │    │    integer types    │    │ raw tuple │
-    │ (i16/u16 or larger) │    │   (where Into<T>)   │    │  (T, i8)  │
+    │    (T or larger)    │    │    (T or smaller)   │    │  (T, i8)  │
     ╰─────────────────────╯    ╰─────────────────────╯    ╰───────────╯
-      ╵          ▲                       │                      ▲
-      ╵          │ TryFrom               │ From                 │ From
-      ╵          │                       ▼                      ▼
+      ╵          ▲                       │                 ▲         │
+      ╵          │ From                  │ From            │ From    │ TryFrom
+      ╵          │                       ▼                 │         ▼
       ╵       ┌───────────────────────────────────────────────────────────┐
       ╵       │              EngineeringQuantity<T>                       │
       ╵       └───────────────────────────────────────────────────────────┘
