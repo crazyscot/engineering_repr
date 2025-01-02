@@ -1,6 +1,12 @@
 // (c) 2024 Ross Younger
 
 #![doc = include_str!("../README.md")]
+//!
+//! # Feature flags
+#![cfg_attr(
+    feature = "document-features",
+    cfg_attr(doc, doc = ::document_features::document_features!())
+)]
 
 use std::cmp::Ordering;
 
@@ -9,6 +15,7 @@ use num_traits::{checked_pow, ConstZero, PrimInt};
 mod string;
 pub use string::{DisplayAdapter, EngineeringRepr};
 
+#[cfg(feature = "serde")]
 mod serde_support;
 
 /// Helper type for expressing numbers in engineering notation
