@@ -4,7 +4,7 @@
 		{
 			"type": "cargo",
 			"command": "doc",
-			"args": ["--no-deps", "--locked"],
+			"args": ["--no-deps", "--locked", "--all-features"],
 			"problemMatcher": [
 				"$rustc"
 			],
@@ -12,12 +12,12 @@
 				"kind": "build",
 				"isDefault": false
 			},
-			"label": "rust: cargo doc"
+			"label": "rust: cargo doc --all-features"
 		},
 		{
 			"type": "cargo",
 			"command": "doc",
-			"args": ["--no-deps", "--locked", "--document-private-items"],
+			"args": ["--no-deps", "--locked", "--document-private-items", "--all-features"],
 			"problemMatcher": [
 				"$rustc"
 			],
@@ -25,7 +25,7 @@
 				"kind": "build",
 				"isDefault": false
 			},
-			"label": "rust: cargo doc --document-private-items"
+			"label": "rust: cargo doc --document-private-items --all-features"
 		}
 	]
 }
