@@ -259,13 +259,14 @@ impl_try_from!(u16, u32, u64, u128, usize, i16, i32, i64, i128, isize);
 // ERRORS
 
 /// Local error type returned by failing conversions
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, thiserror::Error)]
+#[allow(missing_docs)]
 pub enum Error {
-    /// Numeric overflow
+    #[error("Numeric overflow")]
     Overflow,
-    /// Numeric underflow
+    #[error("Numeric underflow")]
     Underflow,
-    /// The input string could not be parsed
+    #[error("The string could not be parsed")]
     ParseError,
 }
 

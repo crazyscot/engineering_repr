@@ -107,7 +107,7 @@ impl<T: EQSupported<T> + FromStr> FromStr for EngineeringQuantity<T> {
             3.. => panic!("impossible"), // coverage cannot reach this line
         }
         if exponent < 0 {
-            return Err(Error::ParseError);
+            return Err(Error::Underflow); // not currently supported
         }
 
         let significand = T::from_str(&to_convert).map_err(|_| Error::ParseError)?;
