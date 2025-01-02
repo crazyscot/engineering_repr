@@ -11,10 +11,13 @@
 use std::cmp::Ordering;
 use std::num::Saturating;
 
-use num_traits::{checked_pow, ConstZero, PrimInt, ToPrimitive};
+use num_traits::{checked_pow, ConstOne, ConstZero, PrimInt, ToPrimitive};
 
 mod string;
 pub use string::{DisplayAdapter, EngineeringRepr};
+
+#[cfg(feature = "float")]
+mod float;
 
 #[cfg(feature = "serde")]
 mod serde_support;
@@ -40,6 +43,7 @@ pub trait EQSupported<T: PrimInt>:
     PrimInt
     + std::fmt::Display
     + ConstZero
+    + ConstOne
     + SignHelper<T>
     + TryInto<i64>
     + TryInto<i128>
@@ -165,9 +169,19 @@ impl<T: EQSupported<T> + From<EngineeringQuantity<T>>> Ord for EngineeringQuanti
     /// assert_lt!(q3, q4);
     /// ```
     fn cmp(&self, other: &Self) -> Ordering {
-        let v1 = <T as From<EngineeringQuantity<T>>>::from(*self);
-        let v2 = <T as From<EngineeringQuantity<T>>>::from(*other);
-        v1.cmp(&v2)
+        if self.exponent == other.exponent {
+            return self.significand.cmp(&other.significand);
+        }
+        // Scale one to meet the other
+        let diff = self.exponent - other.exponent;
+        let diff_abs: u32 = diff.unsigned_abs().into();
+        if diff < 0 {
+            let scaled = other.significand * T::EXPONENT_BASE.pow(diff_abs);
+            self.significand.cmp(&scaled)
+        } else {
+            let scaled_self = self.significand * T::EXPONENT_BASE.pow(diff_abs);
+            scaled_self.cmp(&other.significand)
+        }
     }
 }
 
@@ -250,13 +264,13 @@ where
 
 impl<T: EQSupported<T>> EngineeringQuantity<T> {
     fn check_for_int_overflow(self) -> Result<Self, Error> {
-        if self.exponent < 0 {
-            // This function does NOT trap underflow.
-            return Ok(self);
-        }
         let exp: usize = self.exponent.unsigned_abs().into();
         let Some(factor) = checked_pow(T::EXPONENT_BASE, exp) else {
-            return Err(Error::Overflow);
+            return Err(if self.exponent < 0 {
+                Error::Underflow
+            } else {
+                Error::Overflow
+            });
         };
         let result: T = factor
             .checked_mul(&self.significand)
@@ -271,10 +285,14 @@ macro_rules! impl_from {
         impl<T: EQSupported<T>> From<EngineeringQuantity<T>> for $t
         where $t: From<T>,
         {
-            #[doc = concat!("\
-Conversion to the same storage type (or a larger type)
-is infallible due to the checks at construction time.
-")]
+            /// Conversion to the same storage type (or a larger type)
+            /// is infallible due to the checks at construction time.
+            ///
+            /// <div class="danger">
+            /// This is a lossy conversion, any fractional part will be truncated.
+            /// </div>
+            ///
+            /// Note that if you have [`num_traits`] in scope, you may need to rephrase the conversion as `TryInto::<T>::try_into()`.
             fn from(eq: EngineeringQuantity<T>) -> Self {
                 let abs_exp: u32 = eq.exponent.unsigned_abs().into();
                 let factor: Saturating<Self> = Saturating(T::EXPONENT_BASE.into());
@@ -361,12 +379,16 @@ pub enum Error {
     Underflow,
     #[error("The string could not be parsed")]
     ParseError,
+    #[error("The conversion could not be completed precisely")]
+    ImpreciseConversion,
 }
 
 /////////////////////////////////////////////////////////////////////////
 
 #[cfg(test)]
 mod test {
+    use assertables::{assert_gt, assert_lt};
+
     use super::EngineeringQuantity as EQ;
     use super::Error as EQErr;
 
@@ -391,10 +413,28 @@ mod test {
             (456_000_000_000_000, 0, 456_000, 3),
             (456_000_000_000_000, 0, 456, 4),
         ] {
-            let e1 = EQ::from_raw(*a, *b);
-            let e2 = EQ::from_raw(*c, *d);
+            let e1 = EQ::from_raw(*a, *b).unwrap();
+            let e2 = EQ::from_raw(*c, *d).unwrap();
             assert_eq!(e1, e2);
         }
+    }
+    #[test]
+    fn comparison() {
+        for (a, b, c, d) in &[
+            (1, 0i8, 2, 0i8),
+            (1, 1, 2, 1),
+            (1001, -1, 1002, -1),
+            (4, -1, 4, -2),
+            (400, -1, 400, -2),
+        ] {
+            let e1 = EQ::from_raw(*a, *b).unwrap();
+            let e2 = EQ::from_raw(*c, *d).unwrap();
+            assert_ne!(e1, e2);
+        }
+        let a1 = EQ::from_raw(1, 2).unwrap();
+        let a2 = EQ::from_raw(2, 2).unwrap();
+        assert_gt!(a2, a1);
+        assert_lt!(a1, a2);
     }
 
     #[test]
@@ -406,11 +446,8 @@ mod test {
     }
 
     #[test]
-    fn to_primitive_overflow() {
-        use num_traits::ToPrimitive as _;
-        let t = EQ::from_raw(1i64, -10).unwrap();
-        assert!(t.to_i64().is_none());
-        println!("{}", Into::<i64>::into(t));
+    fn to_primitive_underflow() {
+        let _ = EQ::from_raw(1i64, -10).expect_err("underflow");
     }
 
     #[test]

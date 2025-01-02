@@ -1,16 +1,24 @@
 //! String conversions
 
-use std::{cmp::min, fmt::Display, str::FromStr};
+use std::{
+    cmp::{min, Ordering},
+    fmt::Display,
+    str::FromStr,
+};
 
 use crate::{EQSupported, EngineeringQuantity, Error};
 
 static POSITIVE_MULTIPLIERS: &str = " kMGTPEZYRQ";
+static NEGATIVE_MULTIPLIERS: &str = " munpfazyrq"; // μ is not ASCII, which confounds things a little
 
-fn exponent_to_multiplier(exp: usize) -> &'static str {
-    if exp == 0 {
-        return "";
+fn exponent_to_multiplier(exp: i8) -> &'static str {
+    let abs = exp.unsigned_abs() as usize;
+    match (exp.cmp(&0), abs) {
+        (Ordering::Equal, _) => "",
+        (Ordering::Greater, _) => &POSITIVE_MULTIPLIERS[abs..=abs],
+        (Ordering::Less, 2) => "μ", // special case as non-ASCII
+        (Ordering::Less, _) => &NEGATIVE_MULTIPLIERS[abs..=abs],
     }
-    &POSITIVE_MULTIPLIERS[exp..=exp]
 }
 
 const fn multiplier_to_exponent(prefix: char) -> Option<i8> {
@@ -26,6 +34,16 @@ const fn multiplier_to_exponent(prefix: char) -> Option<i8> {
         'Y' => 8,
         'R' => 9,
         'Q' => 10,
+        'm' => -1,
+        'μ' | 'u' => -2,
+        'n' => -3,
+        'p' => -4,
+        'f' => -5,
+        'a' => -6,
+        'z' => -7,
+        'y' => -8,
+        'r' => -9,
+        'q' => -10,
         _ => return None,
     })
 }
@@ -57,16 +75,20 @@ impl<T: EQSupported<T> + FromStr> FromStr for EngineeringQuantity<T> {
     /// ```
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let prefix = find_multiplier(s);
-        let Some((prefix_index, exponent)) = prefix else {
-            // Easy case: direct integer conversion.
-            // There had better not be a decimal point as that would imply a non-integer!
-            return T::from_str(s)
-                .map_err(|_| Error::ParseError)
-                .and_then(|i| EngineeringQuantity::from_raw(i, 0));
-        };
-
         // Is there a decimal? If so it's standard (non RKM) mode.
         let decimal = s.find('.');
+        let (prefix_index, exponent) = match (prefix, decimal) {
+            // Easy case: direct integer conversion
+            (None, None) => {
+                return T::from_str(s)
+                    .map_err(|_| Error::ParseError)
+                    .and_then(|i| EngineeringQuantity::from_raw(i, 0));
+            }
+            // 1.23 (no multiplier suffix)
+            (None, Some(idx)) => (idx, 0),
+            // General case
+            (Some((id, exp)), _) => (id, exp),
+        };
 
         let split_index = if let Some(d) = decimal {
             // Non-RKM mode (1.5k)
@@ -76,16 +98,16 @@ impl<T: EQSupported<T> + FromStr> FromStr for EngineeringQuantity<T> {
             prefix_index
         };
 
-        let mut to_convert = String::from(&s[0..split_index]);
-        let trailing = &s[split_index + 1..];
+        let mut to_convert = s.chars().take(split_index).collect::<String>();
+        let mut trailing = s.chars().skip(split_index + 1).collect::<String>();
+
         // In non-RKM mode, don't convert the prefix (err, the suffix)
-        let trailing = if decimal.is_some() {
-            &trailing[0..trailing.len() - 1]
-        } else {
-            trailing
-        };
+        if decimal.is_some() && prefix.is_some() {
+            let _ = trailing.pop();
+        }
+
         // Each 3 digits (or part thereof) represents another exponent.
-        to_convert.push_str(trailing);
+        to_convert.push_str(&trailing);
         // If it's not a round multiple of 3, we need to pad !
         #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
         let whole_groups = (trailing.len() / 3) as i8;
@@ -105,9 +127,6 @@ impl<T: EQSupported<T> + FromStr> FromStr for EngineeringQuantity<T> {
                 to_convert.push('0');
             }
             3.. => panic!("impossible"), // coverage cannot reach this line
-        }
-        if exponent < 0 {
-            return Err(Error::Underflow); // not currently supported
         }
 
         let significand = T::from_str(&to_convert).map_err(|_| Error::ParseError)?;
@@ -215,48 +234,81 @@ impl<T: EQSupported<T>> EngineeringQuantity<T> {
 
 impl<T: EQSupported<T>> Display for DisplayAdapter<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        /*
+         * We prepare the output string in five parts:
+         * - Prefix   := "-" (negative) or "" (positive)
+         * - Leaders  := Digits before output decimal point
+         * - Point    := Output decimal point. This is "." (normal mode), or multiplier (rkm mode), or "" (normal mode and there are no trailers)
+         * - Trailers := Digits after output decimal point
+         * - Suffix   := multiplier (normal mode) or "" (rkm mode)
+         *
+         * Algorithm:
+         * 1. Convert significand to digits
+         * 2. Compute the output exponent such that the quantity to the left of the output decimal point is from 1 to 999
+         *    (Positive exponents) Append zeroes in groups of 3 until we reach the true decimal point
+         *    (Negative exponents) Append nothing
+         * 3. Split into leading/trailing (this is a function of the exponent)
+         * 4. Implement precision:
+         *    If precision is arbitrary, trim all trailing zeroes.
+         *    Otherwise, trim trailing digits as necessary to meet the request.
+         */
         let detail = self.value.significand.abs_and_sign();
         let mut digits = detail.abs.to_string();
         // at first glance the output might reasonably be this value of `digits`, followed by `exponent` times "000"...
         // but we need to (re)compute the correct exponent for display.
         let prefix = if detail.negative { "-" } else { "" };
-        digits.reserve((3 * self.value.exponent + 1).unsigned_abs() as usize);
-        if self.value.exponent < 0 {
-            return write!(f, "(underflow error! negative exponents not supported)");
-        }
-        for _ in 0..self.value.exponent {
-            digits.push_str("000");
-        }
-        let output_exponent = (digits.len() - 1) / 3;
+        #[allow(clippy::cast_possible_truncation)]
+        let output_exponent = if self.value.exponent > 0 {
+            // Append zeroes until we reach the decimal point (we may trim some later)
+            digits.reserve((3 * self.value.exponent + 1).unsigned_abs() as usize);
+            for _ in 0..self.value.exponent {
+                digits.push_str("000");
+            }
+            ((digits.len() - 1) / 3) as i8
+        } else {
+            // Negative or zero exponent: Append nothing, but we need a different formula for the output exponent
+            self.value.exponent + ((digits.len() - 1) / 3) as i8
+        };
         let si = exponent_to_multiplier(output_exponent);
-        let leading = digits.len() - output_exponent * 3;
 
+        let n_leading = if output_exponent > 0 {
+            digits.len() - output_exponent.unsigned_abs() as usize * 3
+        } else {
+            match digits.len() % 3 {
+                0 => 3,
+                i => i,
+            }
+        };
         let precision = match self.max_significant_figures {
-            0 => usize::MAX, // automatic mode: take all the digits, we'll trim trailing 0s in a moment
+            0 => usize::MAX, // automatic mode: take the digits we've got from a full conversion, we'll trim trailing 0s in a moment
             i => i,
         };
-        let trailing = min(
+        let n_trailing = min(
             // number of digits remaining
-            digits.len() - leading,
-            // number of digits we'd take to reach the requested number of s.f.
-            precision - min(precision, leading),
+            digits.len() - n_leading,
+            // number of digits we'd take to reach the requested precision
+            precision - min(precision, n_leading),
         );
-        let leaders = &digits[0..leading];
-        let mut trailers = &digits[leading..leading + min(trailing, precision)];
+        let leaders = &digits[0..n_leading];
+        let mut trailers = &digits[n_leading..n_leading + min(n_trailing, precision)];
         if precision == usize::MAX {
             while trailers.ends_with('0') {
                 trailers = &trailers[0..trailers.len() - 1];
             }
         }
-        let mid = if self.rkm {
-            si
-        } else if trailers.is_empty() {
-            ""
-        } else {
-            "."
+        // Point and suffix strings resolve to a 3-boolean truth table...
+        let (point, suffix) = match (output_exponent == 0, self.rkm, trailers.is_empty()) {
+            // Output exponent is 0: mode is irrelevant, no suffix, suppress point if there are no digits after it
+            (true, _, true) => ("", ""),
+            (true, _, false) => (".", ""),
+
+            // Exponent non zero, RKM mode: point is always SI, no suffix
+            (false, true, _) => (si, ""),
+            // Exponent non zero, Standard mode:
+            (false, false, true) => ("", si), // No trailer, suppress point
+            (false, false, false) => (".", si), // With trailer, output point
         };
-        let suffix = if self.rkm { "" } else { si };
-        write!(f, "{prefix}{leaders}{mid}{trailers}{suffix}")
+        write!(f, "{prefix}{leaders}{point}{trailers}{suffix}")
     }
 }
 
@@ -371,7 +423,7 @@ mod test {
 
     #[test]
     fn parse_failures() {
-        for s in &["foo", "1.2", "1.2.3k", "1.2345k", "--1"] {
+        for s in &["foo", "1.2.3k", "--1"] {
             let _ = EQ::<i128>::from_str(s).expect_err(&format!("this should have failed: {s}"));
         }
     }
@@ -382,14 +434,14 @@ mod test {
             (1i128, "1"),
             (42, "42"),
             (999, "999"),
-            (1000, "1.00k"),
-            (1500, "1.50k"),
+            (1000, "1.00k"), // TODO FIXME 1k ?
+            (1500, "1.50k"), // FIXME 1.5k ?
             (2345, "2.34k"),
             (9999, "9.99k"),
             (12_345, "12.3k"),
-            (13_000, "13.0k"),
+            (13_000, "13.0k"), // 13k ?
             (999_999, "999k"),
-            (1_000_000, "1.00M"),
+            (1_000_000, "1.00M"), // TODO 1M ?
             (2_345_678, "2.34M"),
             (999_999_999, "999M"),
             (12_345_000_000_000_000_000_000_000_000, "12.3R"),
@@ -401,6 +453,83 @@ mod test {
             let ss2 = ee2.to_string();
             assert_eq!(ss2.chars().next().unwrap(), '-');
             assert_eq!(&ss2[1..], *s);
+        }
+    }
+    #[test]
+    fn to_string_small() {
+        for (i, e, s) in &[
+            (1, -1, "1m"),
+            (999, -1, "999m"),
+            (1, -2, "1μ"),
+            //(1001, -2, "1m"),     // TODO FIXME
+            //(1001, -1, "1"),      // FIXME
+            //(1_000_001, -2, "1"), // FIXME
+            (1_111, -1, "1.11"),
+            (1010, -3, "1.01μ"),
+            (1010, -4, "1.01n"),
+            (1010, -5, "1.01p"),
+            (1010, -6, "1.01f"),
+            (1010, -7, "1.01a"),
+            (1010, -8, "1.01z"),
+            (1010, -9, "1.01y"),
+            (1010, -10, "1.01r"),
+            (1010, -11, "1.01q"),
+        ] {
+            let ee = EQ::<i128>::from_raw(*i, *e).unwrap();
+            assert_eq!(ee.to_string(), *s, "inputs {i}, {e}");
+            let ee2 = EQ::<i128>::from_raw(-*i, *e).unwrap();
+            let mut expected = (*s).to_string();
+            expected.insert(0, '-');
+            assert_eq!(ee2.to_string(), expected, "inputs -{i}, {e}");
+        }
+        for (i, e, s) in &[
+            (1, -1, "1m"),
+            (999, -1, "999m"),
+            (1, -2, "1μ"),
+            (1001, -2, "1m001"),
+            (1001, -1, "1.001"),
+            (1_000_001, -2, "1.000"),
+        ] {
+            let ee = EQ::<i128>::from_raw(*i, *e).unwrap();
+            assert_eq!(ee.rkm_with_precision(4).to_string(), *s, "inputs {i}, {e}");
+        }
+    }
+    #[test]
+    fn from_string_small() {
+        for (i, e, s) in &[
+            (1, -1, "1m"),
+            (999, -1, "999m"),
+            (1, -2, "1μ"),
+            (1001, -2, "1.001m"),
+            (1001, -1, "1.001"),
+            (1, 0, "1"),
+            (1_000_001, -2, "1.000001"),
+            (1_111, -1, "1.111"),
+            (1010, -3, "1.01μ"),
+            (1010, -4, "1.01n"),
+            (1010, -5, "1.01p"),
+            (1010, -6, "1.01f"),
+            (1010, -7, "1.01a"),
+            (1010, -8, "1.01z"),
+            (1010, -9, "1.01y"),
+            (1010, -10, "1.01r"),
+            (1010, -11, "1.01q"),
+        ] {
+            let ee3 = EQ::<i128>::from_str(s).unwrap();
+            let expected_raw = (*i, *e);
+            assert_eq!(ee3.to_raw(), expected_raw);
+        }
+        for (i, e, s) in &[
+            (1, -1, "1m"),
+            (999, -1, "999m"),
+            (1, -2, "1μ"),
+            (1001, -2, "1m001"),
+            (1001, -1, "1.001"),
+            (1_000_001, -2, "1.000001"),
+        ] {
+            let ee2 = EQ::<i64>::from_str(s).unwrap();
+            let expected_raw = (*i, *e);
+            assert_eq!(ee2.to_raw(), expected_raw);
         }
     }
     #[test]
@@ -460,13 +589,6 @@ mod test {
         println!("{e:?} -> {e}");
         println!("{e2:?} -> {e2}");
         let _ = e.to_string();
-    }
-    #[test]
-    fn underflow() {
-        let e = EQ::from_raw(1u16, 0).unwrap();
-        let e2 = EQ::from_raw(1u16, -1).unwrap();
-        assert_ne!(e, e2);
-        assert!(e2.to_string().contains("underflow"));
     }
 
     #[test]
