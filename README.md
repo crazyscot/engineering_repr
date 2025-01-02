@@ -3,12 +3,16 @@
 [![Build status](https://github.com/crazyscot/engineering_repr/actions/workflows/rust.yml/badge.svg)](https://github.com/crazyscot/engineering_repr/actions/workflows/rust.yml)
 [![Documentation](https://img.shields.io/docsrs/engineering-repr)](https://docs.rs/engineering_repr/)
 ![License](https://img.shields.io/badge/license-MIT-blue)
-[![Coverage](https://img.shields.io/coverallsCoverage/github/crazyscot/engineering_repr)](https://coveralls.io/github/crazyscot/engineering_repr)
+[![Coverage](https://coveralls.io/repos/github/crazyscot/engineering_repr/badge.svg?branch=main)](https://coveralls.io/github/crazyscot/engineering_repr?branch=main)
 
 Numeric conversions for [engineering notation](https://en.wikipedia.org/wiki/Engineering_notation)
-and the [RKM code](https://en.wikipedia.org/wiki/RKM_code) variant.
+and [RKM code](https://en.wikipedia.org/wiki/RKM_code).
 
-In engineering applications it is common to express quantities relative to the next-lower power of 1000, described by an SI (metric) prefix.
+## Overview
+
+In engineering applications it is common to express quantities relative to the next-lower power of 1000, described by an [SI (metric) prefix](https://en.wikipedia.org/wiki/Metric_prefix).
+
+This is normally done by writing the SI multiplier after the quantity. In the "RKM code" variant, the SI multiplier replaces the decimal point.
 
 For example:
 
@@ -23,18 +27,31 @@ For example:
 
 And so on going up the SI prefixes, including the new ones R (10<sup>27</sup>) and Q (10<sup>30</sup>) which were added in 2022.
 
-
-## Overview
-
-This crate is centred around the `EngineeringQuantity` type.
+This crate exists to support convenient conversion of numbers to/from engineering and RKM notation.
 The intended use case is reading user-entered strings from configuration files.
 
-* When using `EngineeringQuantity` you must specify the storage parameter type to use.
+## Detail
+
+This crate is centred around the [`EngineeringQuantity<T>`] type.
+
+* The generic parameter `T` specifies the storage type to use for the significand.
   This can be any primitive integer except for `i8` or `u8`.
-* Conversion from string autodetects both standard and RKM code variants.
-* An `EngineeringQuantity` may be converted to/from most primitive integer types.
-* You can convert directly to string, or via the `DisplayAdapter` type for more control.
-* Primitive integers may be converted directly to string via the `EngineeringRepr` convenience trait.
+  * For example, `EngineeringQuantity<u64>`.
+* The exponent is always stored as an `i8`.
+
+You can convert an `EngineeringQuantity` to:
+* most primitive integer types (not `i8` or `u8`)
+* String, directly by [`std::fmt::Display`], or via the [`DisplayAdapter`] type for control over the output.
+* its component parts, as a tuple `(<StorageT>, i8)` (see [`to_raw`](EngineeringQuantity::to_raw))
+* another `EngineeringQuantity` of a different storage type
+
+You can create an `EngineeringQuantity` from:
+* most primitive integer types (not `i8` or `u8`)
+* `&str`, by [`FromStr`](core::str::FromStr)
+  * this autodetects both standard and RKM code variants
+* its component parts `(<StorageT>, i8)` (see [`from_raw`](EngineeringQuantity::from_raw)).
+
+Primitive integers may be converted directly to string via the `EngineeringRepr` convenience trait.
 
 Or, if you prefer, here are the type relations in diagram form:
 
@@ -66,9 +83,9 @@ Or, if you prefer, here are the type relations in diagram form:
               ╰─────────────────────╯ ◀───────────────────────────────┘
 ```
 
-## Examples
+### Examples
 
-### String to number
+#### String to number
 ```rust
 use engineering_repr::EngineeringQuantity as EQ;
 use std::str::FromStr as _;
@@ -82,7 +99,7 @@ let eq2 = EQ::<i64>::from_str("1k5").unwrap();
 assert_eq!(eq, eq2);
 ```
 
-### Number to string
+#### Number to string
 ```rust
 use engineering_repr::EngineeringQuantity as EQ;
 
@@ -109,12 +126,12 @@ assert_eq!("123.456k", 123456.to_eng(0)); // automatic precision
 assert_eq!("123k4", 123456.to_rkm(4));
 ```
 
-### Limitations
+# Limitations
 
-* This crate only supports integers at the present time. The smaller multipliers (m, μ, n, p, f, a, z, y, r, q) are not supported.
+* This crate only supports integers at the present time. The smaller multipliers (m, μ, n, p, f, a, z, y, r, q) are not currently supported.
 * Multipliers which are not a power of 1000 (da, h, d, c) are not supported.
 
-## Alternatives
+# Alternatives
 
 * [human-repr](https://crates.io/crates/human-repr) is great for converting numbers to human-friendly representations.
 * [humanize-rs](https://crates.io/crates/humanize-rs) is great for converting some human-friendly representations to numbers, though engineering-repr offers more flexibility.
