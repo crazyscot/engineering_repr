@@ -1,16 +1,23 @@
 //! String conversions
 
-use std::{cmp::min, fmt::Display, str::FromStr};
+use std::{
+    cmp::{min, Ordering},
+    fmt::Display,
+    str::FromStr,
+};
 
 use crate::{EQSupported, EngineeringQuantity, Error};
 
 static POSITIVE_MULTIPLIERS: &str = " kMGTPEZYRQ";
+static NEGATIVE_MULTIPLIERS: &str = " mμnpfazyrq"; // also support 'u' as an alias
 
-fn exponent_to_multiplier(exp: usize) -> &'static str {
-    if exp == 0 {
-        return "";
+fn exponent_to_multiplier(exp: i8) -> &'static str {
+    let abs = exp.unsigned_abs() as usize;
+    match exp.cmp(&0) {
+        Ordering::Equal => "",
+        Ordering::Greater => &POSITIVE_MULTIPLIERS[abs..=abs],
+        Ordering::Less => &NEGATIVE_MULTIPLIERS[abs..=abs],
     }
-    &POSITIVE_MULTIPLIERS[exp..=exp]
 }
 
 const fn multiplier_to_exponent(prefix: char) -> Option<i8> {
@@ -26,6 +33,16 @@ const fn multiplier_to_exponent(prefix: char) -> Option<i8> {
         'Y' => 8,
         'R' => 9,
         'Q' => 10,
+        'm' => -1,
+        'μ' | 'u' => -2,
+        'n' => -3,
+        'p' => -4,
+        'f' => -5,
+        'a' => -6,
+        'z' => -7,
+        'y' => -8,
+        'r' => -9,
+        'q' => -10,
         _ => return None,
     })
 }
