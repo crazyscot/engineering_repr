@@ -32,7 +32,7 @@ The intended use case is reading user-entered strings from configuration files.
 
 ## Detail
 
-This crate is centred around the [`EngineeringQuantity<T>`] type.
+This crate is centred around the [`EngineeringQuantity`]`<T>` type.
 
 * The generic parameter `T` specifies the storage type to use for the significand.
   This can be any primitive integer except for `i8` or `u8`.
