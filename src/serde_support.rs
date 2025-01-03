@@ -6,6 +6,9 @@ use serde::{de, Deserialize, Serialize};
 
 use crate::{EQSupported, EngineeringQuantity};
 
+/// <div class="warning">
+/// Available on feature <b>serde</b> only.
+/// </div>
 impl<T: EQSupported<T>> Serialize for EngineeringQuantity<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -16,6 +19,9 @@ impl<T: EQSupported<T>> Serialize for EngineeringQuantity<T> {
     }
 }
 
+/// <div class="warning">
+/// Available on feature <b>serde</b> only.
+/// </div>
 impl<'de, T: EQSupported<T> + FromStr> Deserialize<'de> for EngineeringQuantity<T> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
