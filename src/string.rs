@@ -143,13 +143,14 @@ impl<T: EQSupported<T> + FromStr> FromStr for EngineeringQuantity<T> {
 // NUMBER TO STRING
 
 impl<T: EQSupported<T>> Display for EngineeringQuantity<T> {
-    /// Default behaviour is to output to 3 significant figures, standard (not RKM) mode.
+    /// Default behaviour is to output to 3 significant figures, skip unnecessary trailing zeros,
+    /// standard (not RKM) mode.
     /// See [`EngineeringQuantity::default()`].
     /// # Examples
     /// ```
     /// use engineering_repr::EngineeringQuantity as EQ;
     /// let ee1 = EQ::<i32>::from(1200);
-    /// assert_eq!(ee1.to_string(), "1.20k");
+    /// assert_eq!(ee1.to_string(), "1.2k");
     /// let ee2 = EQ::<i32>::from(123456);
     /// assert_eq!(ee2.to_string(), "123k");
     /// ```
@@ -178,6 +179,8 @@ where
     pub max_significant_figures: usize,
     /// Specifies [RKM code](https://en.wikipedia.org/wiki/RKM_code) mode
     pub rkm: bool,
+    /// Always emit the precision requested, even any unnecessary untrailing zeroes after the decimal point.
+    pub strict: bool,
 }
 
 impl<T: EQSupported<T>> Default for DisplayAdapter<T> {
@@ -189,6 +192,7 @@ impl<T: EQSupported<T>> Default for DisplayAdapter<T> {
             },
             max_significant_figures: 3,
             rkm: false,
+            strict: false,
         }
     }
 }
@@ -214,6 +218,7 @@ impl<T: EQSupported<T>> EngineeringQuantity<T> {
             value: *self,
             max_significant_figures,
             rkm: false,
+            strict: false,
         }
     }
     /// Creates an RKM [`DisplayAdapter`] for this object in RKM mode, with the given precision.
@@ -228,6 +233,23 @@ impl<T: EQSupported<T>> EngineeringQuantity<T> {
             value: *self,
             max_significant_figures,
             rkm: true,
+            strict: false,
+        }
+    }
+    /// Creates a [`DisplayAdapter`] for this object, with strict precision.
+    /// The requested digits will always be output, even trailing zeroes.
+    /// ```
+    /// use engineering_repr::EngineeringQuantity as EQ;
+    /// let ee = EQ::<i32>::from(1_200);
+    /// assert_eq!(ee.with_strict_precision(3).to_string(), "1.20k");
+    /// ```
+    #[must_use]
+    pub fn with_strict_precision(&self, max_significant_figures: usize) -> DisplayAdapter<T> {
+        DisplayAdapter {
+            value: *self,
+            max_significant_figures,
+            rkm: false,
+            strict: true,
         }
     }
 }
@@ -283,6 +305,12 @@ impl<T: EQSupported<T>> Display for DisplayAdapter<T> {
             0 => usize::MAX, // automatic mode: take the digits we've got from a full conversion, we'll trim trailing 0s in a moment
             i => i,
         };
+        if self.strict {
+            let pad = self.max_significant_figures.saturating_sub(digits.len());
+            for _ in 0..pad {
+                digits.push('0');
+            }
+        }
         let n_trailing = min(
             // number of digits remaining
             digits.len() - n_leading,
@@ -291,7 +319,7 @@ impl<T: EQSupported<T>> Display for DisplayAdapter<T> {
         );
         let leaders = &digits[0..n_leading];
         let mut trailers = &digits[n_leading..n_leading + min(n_trailing, precision)];
-        if precision == usize::MAX {
+        if !self.strict {
             while trailers.ends_with('0') {
                 trailers = &trailers[0..trailers.len() - 1];
             }
@@ -434,14 +462,14 @@ mod test {
             (1i128, "1"),
             (42, "42"),
             (999, "999"),
-            (1000, "1.00k"), // TODO FIXME 1k ?
-            (1500, "1.50k"), // FIXME 1.5k ?
+            (1000, "1k"),
+            (1500, "1.5k"),
             (2345, "2.34k"),
             (9999, "9.99k"),
             (12_345, "12.3k"),
-            (13_000, "13.0k"), // 13k ?
+            (13_000, "13k"),
             (999_999, "999k"),
-            (1_000_000, "1.00M"), // TODO 1M ?
+            (1_000_000, "1M"),
             (2_345_678, "2.34M"),
             (999_999_999, "999M"),
             (12_345_000_000_000_000_000_000_000_000, "12.3R"),
@@ -461,9 +489,9 @@ mod test {
             (1, -1, "1m"),
             (999, -1, "999m"),
             (1, -2, "1μ"),
-            //(1001, -2, "1m"),     // TODO FIXME
-            //(1001, -1, "1"),      // FIXME
-            //(1_000_001, -2, "1"), // FIXME
+            (1001, -2, "1m"),
+            (1001, -1, "1"),
+            (1_000_001, -2, "1"),
             (1_111, -1, "1.11"),
             (1010, -3, "1.01μ"),
             (1010, -4, "1.01n"),
@@ -488,7 +516,7 @@ mod test {
             (1, -2, "1μ"),
             (1001, -2, "1m001"),
             (1001, -1, "1.001"),
-            (1_000_001, -2, "1.000"),
+            (1_000_001, -2, "1"),
         ] {
             let ee = EQ::<i128>::from_raw(*i, *e).unwrap();
             assert_eq!(ee.rkm_with_precision(4).to_string(), *s, "inputs {i}, {e}");
@@ -538,14 +566,14 @@ mod test {
             (1i128, "1"),
             (42, "42"),
             (999, "999"),
-            (1000, "1k0"),
+            (1000, "1k"),
             (1500, "1k5"),
             (2345, "2k3"),
             (9999, "9k9"),
             (12_345, "12k"),
             (13_000, "13k"),
             (999_999, "999k"),
-            (1_000_000, "1M0"),
+            (1_000_000, "1M"),
             (2_345_678, "2M3"),
             (999_999_999, "999M"),
             (12_345_000_000_000_000_000_000_000_000, "12R"),
@@ -572,9 +600,9 @@ mod test {
     fn raw_to_string() {
         for (sig, exp, str) in &[
             (1, 0i8, "1"),
-            (1, 1, "1.00k"),
-            (1000, 0, "1.00k"),
-            (1000, 1, "1.00M"),
+            (1, 1, "1k"),
+            (1000, 0, "1k"),
+            (1000, 1, "1M"),
         ] {
             let e = EQ::<i128>::from_raw(*sig, *exp).unwrap();
             assert_eq!(e.to_string(), *str, "test case: {sig},{exp} -> {str}");
@@ -618,5 +646,10 @@ mod test {
             assert_eq!(ss2.chars().next().unwrap(), '-');
             assert_eq!(&ss2[1..], *s, "input={}", -*i);
         }
+    }
+    #[test]
+    fn strict_precision() {
+        let ee = EQ::<i64>::from_raw(1234, -3).unwrap();
+        assert_eq!(ee.with_strict_precision(6).to_string(), "1.23400μ");
     }
 }
