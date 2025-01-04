@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0](https://github.com/crazyscot/engineering_repr/compare/v0.2.0...v0.3.0)
+
+### ⛰️ Features
+
+- [**breaking**] Check for overflow on construction, make conversions to integer infallible - ([7400901](https://github.com/crazyscot/engineering_repr/commit/74009012d022778e9284bdb9b98c93c3be790717))
+
 ## [0.2.0](https://github.com/crazyscot/engineering_repr/compare/v0.1.0...v0.2.0)
 
 ### ⛰️ Features
