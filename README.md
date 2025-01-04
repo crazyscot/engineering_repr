@@ -118,9 +118,11 @@ assert_eq!(f, 0.003);
 ```rust
 use engineering_repr::EngineeringQuantity as EQ;
 
-// default precision (3 places)
+// default precision (3 places, "sloppy" omitting trailing zeroes)
 let ee1 = EQ::<i32>::from(1200);
-assert_eq!(ee1.to_string(), "1.20k");
+assert_eq!(ee1.to_string(), "1.2k");
+// strict precision
+assert_eq!(ee1.with_strict_precision(3).to_string(), "1.20k");
 // explicit precision
 let ee2 = EQ::<i32>::from(1234567);
 assert_eq!(ee2.with_precision(2).to_string(), "1.2M");
