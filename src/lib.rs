@@ -9,6 +9,7 @@
 )]
 
 use std::cmp::Ordering;
+use std::num::Saturating;
 
 use num_traits::{checked_pow, ConstZero, PrimInt, ToPrimitive};
 
@@ -275,12 +276,13 @@ Conversion to the same storage type (or a larger type)
 is infallible due to the checks at construction time.
 ")]
             fn from(eq: EngineeringQuantity<T>) -> Self {
-                let abs_exp: usize = eq.exponent.unsigned_abs().into();
-                let factor: Self = num_traits::pow(T::EXPONENT_BASE.into(), abs_exp);
+                let abs_exp: u32 = eq.exponent.unsigned_abs().into();
+                let factor: Saturating<Self> = Saturating(T::EXPONENT_BASE.into());
+                let factor = factor.pow(abs_exp);
                 if eq.exponent > 0 {
-                    Self::from(eq.significand) * factor
+                    Self::from(eq.significand) * factor.0
                 } else {
-                    Self::from(eq.significand) / factor
+                    Self::from(eq.significand) / factor.0
                 }
             }
         }
@@ -291,14 +293,14 @@ is infallible due to the checks at construction time.
 impl_from!(u16, u32, u64, u128, usize, i16, i32, i64, i128, isize);
 
 impl<T: EQSupported<T>> EngineeringQuantity<T> {
-    fn apply_factor<U: EQSupported<U>>(self, sig: U) -> U {
+    fn apply_factor<U: EQSupported<U>>(self, sig: U) -> Option<U> {
         let abs_exp: usize = self.exponent.unsigned_abs().into();
-        let factor: U = num_traits::pow(U::EXPONENT_BASE, abs_exp);
-        if self.exponent >= 0 {
+        let factor = checked_pow(U::EXPONENT_BASE, abs_exp)?;
+        Some(if self.exponent >= 0 {
             sig * factor
         } else {
             sig / factor
-        }
+        })
     }
 }
 
@@ -318,7 +320,7 @@ impl<T: EQSupported<T>> ToPrimitive for EngineeringQuantity<T> {
             Ok(ii) => ii,
             Err(_) => return None,
         };
-        Some(self.apply_factor(i))
+        self.apply_factor(i)
     }
 
     fn to_u64(&self) -> Option<u64> {
@@ -326,7 +328,7 @@ impl<T: EQSupported<T>> ToPrimitive for EngineeringQuantity<T> {
             Ok(ii) => ii,
             Err(_) => return None,
         };
-        Some(self.apply_factor(i))
+        self.apply_factor(i)
     }
 
     fn to_i128(&self) -> Option<i128> {
@@ -334,7 +336,7 @@ impl<T: EQSupported<T>> ToPrimitive for EngineeringQuantity<T> {
             Ok(ii) => ii,
             Err(_) => return None,
         };
-        Some(self.apply_factor(i))
+        self.apply_factor(i)
     }
 
     fn to_u128(&self) -> Option<u128> {
@@ -342,7 +344,7 @@ impl<T: EQSupported<T>> ToPrimitive for EngineeringQuantity<T> {
             Ok(ii) => ii,
             Err(_) => return None,
         };
-        Some(self.apply_factor(i))
+        self.apply_factor(i)
     }
 }
 
@@ -401,6 +403,14 @@ mod test {
         let u = t.convert::<u64>();
         assert_eq!(u.to_raw().0, <u32 as Into<u64>>::into(t.to_raw().0));
         assert_eq!(t.to_raw().1, u.to_raw().1);
+    }
+
+    #[test]
+    fn to_primitive_overflow() {
+        use num_traits::ToPrimitive as _;
+        let t = EQ::from_raw(1i64, -10).unwrap();
+        assert!(t.to_i64().is_none());
+        println!("{}", Into::<i64>::into(t));
     }
 
     #[test]
