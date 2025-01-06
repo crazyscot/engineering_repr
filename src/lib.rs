@@ -257,7 +257,9 @@ impl<T: EQSupported<T>> EngineeringQuantity<T> {
         let Some(factor) = checked_pow(T::EXPONENT_BASE, exp) else {
             return Err(Error::Overflow);
         };
-        let result: T = factor * self.significand;
+        let result: T = factor
+            .checked_mul(&self.significand)
+            .ok_or(Error::Overflow)?;
         let _ = std::convert::TryInto::<T>::try_into(result).map_err(|_| Error::Overflow)?;
         Ok(self)
     }
@@ -403,11 +405,15 @@ mod test {
 
     #[test]
     fn overflow() {
+        // When the number is too big to fit into the destination type, the conversion fails.
         let t = EQ::<u32>::from_raw(100_000, 0).unwrap();
         let _ = t.try_convert::<u16>().expect_err("TryFromIntError");
 
-        // 10^15 is too big for a u32, so will overflow:
+        // 10^15 is too big for a u32, so overflow:
         assert_eq!(EQ::<u32>::from_raw(1, 5), Err(EQErr::Overflow));
+
+        // The significand and exponent may both fit on their own, but overflow when combined:
+        assert_eq!(EQ::<u64>::from_raw(100_000, 5), Err(EQErr::Overflow));
     }
 
     #[test]
