@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1](https://github.com/crazyscot/engineering_repr/compare/v0.3.0...v0.3.1)
+
+### 🐛 Bug Fixes
+
+- ToPrimitive copes gracefully with large negative exponents - ([4753d21](https://github.com/crazyscot/engineering_repr/commit/4753d21ab3eba9a2f43059f4cf3d5e77d834d879))
+- Don't crash when significand and exponent combine to be too large for the destination type - ([5f72609](https://github.com/crazyscot/engineering_repr/commit/5f7260955708abc0377524d918af77152bc3922d))
+
+
 ## [0.3.0](https://github.com/crazyscot/engineering_repr/compare/v0.2.0...v0.3.0)
 
 ### ⛰️ Features
