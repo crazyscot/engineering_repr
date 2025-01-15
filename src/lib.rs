@@ -157,7 +157,7 @@ impl<T: EQSupported<T> + From<EngineeringQuantity<T>>> PartialOrd for Engineerin
 impl<T: EQSupported<T> + From<EngineeringQuantity<T>>> Ord for EngineeringQuantity<T> {
     /// ```
     /// use engineering_repr::EngineeringQuantity as EQ;
-    /// use more_asserts::assert_lt;
+    /// use assertables::assert_lt;
     /// let q2 = EQ::from_raw(41999,0).unwrap();
     /// let q3 = EQ::from_raw(42,1).unwrap();
     /// let q4 = EQ::from_raw(42001,0).unwrap();
