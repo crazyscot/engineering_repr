@@ -16,13 +16,15 @@ use num_traits::{checked_pow, ConstOne, ConstZero, PrimInt, ToPrimitive};
 mod string;
 pub use string::{DisplayAdapter, EngineeringRepr};
 
-#[cfg(feature = "float")]
 mod float;
 
 #[cfg(feature = "serde")]
 mod serde_support;
 
-/// Helper type for expressing numbers in engineering notation
+/// A helper type for expressing numbers in engineering notation.
+///
+/// These numbers may be converted to and from integers, strings, and [`num_rational::Ratio`]. They may also be
+/// converted to floats.
 ///
 /// # Type parameter
 /// The type parameter `T` is the underlying storage type used for the significand of the number.
@@ -322,7 +324,11 @@ impl<T: EQSupported<T>> EngineeringQuantity<T> {
     }
 }
 
-impl<T: EQSupported<T>> ToPrimitive for EngineeringQuantity<T> {
+impl<T: EQSupported<T>> ToPrimitive for EngineeringQuantity<T>
+where
+    f64: TryFrom<EngineeringQuantity<T>>,
+{
+    /// Converts `self` to an `i64`. If teh value cannot be represented by an `i64`, then `None` is returned.
     /// ```
     /// use num_traits::cast::ToPrimitive as _;
     /// let e = engineering_repr::EngineeringQuantity::<u32>::from(65_537u32);
@@ -349,6 +355,7 @@ impl<T: EQSupported<T>> ToPrimitive for EngineeringQuantity<T> {
         self.apply_factor(i)
     }
 
+    /// Converts `self` to an `i128`. If the value cannot be represented by an `i128`, then `None` is returned.
     fn to_i128(&self) -> Option<i128> {
         let i: i128 = match self.significand.try_into() {
             Ok(ii) => ii,
@@ -357,12 +364,34 @@ impl<T: EQSupported<T>> ToPrimitive for EngineeringQuantity<T> {
         self.apply_factor(i)
     }
 
+    /// Converts `self` to a `u128`. If the value cannot be represented by a `u128`, then `None` is returned.
     fn to_u128(&self) -> Option<u128> {
         let i: u128 = match self.significand.try_into() {
             Ok(ii) => ii,
             Err(_) => return None,
         };
         self.apply_factor(i)
+    }
+
+    /// Converts `self` to an `f64`. If the value cannot be represented by an `f64`, then `None` is returned.
+    ///
+    /// As ever, if you need to compare floating point numbers, beware of epsilon issues.
+    /// If a precise comparison is needed then converting to a [`num_rational::Ratio`] may suit.
+    /// ```
+    /// use engineering_repr::EngineeringQuantity as EQ;
+    /// use std::str::FromStr as _;
+    /// let eq = EQ::<u32>::from_str("123m").unwrap();
+    ///
+    /// // TryFrom conversion
+    /// assert_eq!(f64::try_from(eq), Ok(0.123));
+    ///
+    /// // Conversion via ToPrimitive
+    /// use num_traits::cast::ToPrimitive as _;
+    /// assert_eq!(eq.to_f32(), Some(0.123));
+    /// assert_eq!(eq.to_f64(), Some(0.123));
+    /// ```
+    fn to_f64(&self) -> Option<f64> {
+        f64::try_from(*self).ok()
     }
 }
 

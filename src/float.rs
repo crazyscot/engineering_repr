@@ -67,12 +67,32 @@ where
 }
 
 /////////////////////////////////////////////////////////////////////////////////
+// FLOAT
+
+impl<T: EQSupported<T>> TryFrom<EngineeringQuantity<T>> for f64
+where
+    Ratio<T>: num_traits::ToPrimitive,
+    Ratio<T>: TryFrom<EngineeringQuantity<T>, Error = crate::Error>,
+{
+    type Error = Error;
+
+    fn try_from(value: EngineeringQuantity<T>) -> Result<Self, Self::Error> {
+        use num_traits::ToPrimitive as _;
+        let r = Ratio::<T>::try_from(value)?;
+        r.to_f64().ok_or(Error::ImpreciseConversion)
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////
 
 #[cfg(test)]
 mod test {
+    use std::str::FromStr as _;
+
     use super::EngineeringQuantity as EQ;
     use super::Error;
     use num_rational::Ratio;
+    use num_traits::ToPrimitive;
 
     #[test]
     fn to_ratio() {
@@ -129,5 +149,42 @@ mod test {
         let ratio = Ratio::new(1, 333);
         let result = EQ::<i64>::try_from(ratio).unwrap_err();
         assert_eq!(result, Error::ImpreciseConversion);
+    }
+
+    const FLOAT_TEST_CASES: &[(&str, f64)] = &[
+        ("42", 42.0),
+        ("1m", 0.001),
+        ("1001m", 1.001),
+        ("1001100m", 1001.1),
+        ("1001100u", 1.001_1),
+        ("43M5", 43_500_000.0),
+        ("1a", 0.000_000_000_000_000_001),
+    ];
+
+    #[test]
+    fn to_f64() {
+        use assertables::assert_in_epsilon;
+
+        for (s, expected) in FLOAT_TEST_CASES {
+            let eq = EQ::<i64>::from_str(s).unwrap();
+            let f = eq.to_f64().unwrap();
+            assert_in_epsilon!(f, *expected, f64::EPSILON);
+        }
+
+        for s in &["1z", "1y", "1r", "1q"] {
+            let eq = EQ::<i64>::from_str(s);
+            assert_eq!(eq, Err(Error::Underflow));
+        }
+    }
+    #[test]
+    #[allow(clippy::cast_possible_truncation)]
+    fn to_f32() {
+        use assertables::assert_in_epsilon;
+
+        for (s, expected) in FLOAT_TEST_CASES {
+            let eq = EQ::<i64>::from_str(s).unwrap();
+            let f = eq.to_f32().unwrap();
+            assert_in_epsilon!(f, (*expected) as f32, f32::EPSILON);
+        }
     }
 }
