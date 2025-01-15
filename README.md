@@ -42,12 +42,15 @@ This crate is centred around the `EngineeringQuantity<T>` type.
 You can convert an `EngineeringQuantity` to:
 * type `T`, or a larger integer type (one which implements `From<T>`)
 * String, optionally via the `DisplayAdapter` type for control over the output.
-* its component parts, as a tuple `(<T>, i8)` (see `to_raw`)
 * another `EngineeringQuantity` of a larger storage type (see `convert`; the new type must implement `From<T>`)
+* floats (`f32` or `f64`) _(note that this is a one-way conversion)_
+* `num_rational::Ratio`
+* its component parts, as a tuple `(<T>, i8)` (see `to_raw`)
 
 You can create an `EngineeringQuantity` from:
 * type `T`, or a smaller integer type (one which implements `Into<T>`)
 * String or `&str`, which autodetects both standard and RKM code variants
+* `num_rational::Ratio`
 * its component parts `(<T>, i8)` (see `from_raw`)
   * N.B. this applies an overflow check; it will fail if the number cannot fit into `T`.
 
@@ -89,6 +92,7 @@ Or, if you prefer, here are the type relations in diagram form:
 ```rust
 use engineering_repr::EngineeringQuantity as EQ;
 use std::str::FromStr as _;
+use num_rational::Ratio;
 
 // Standard notation
 let eq = EQ::<i64>::from_str("1.5k").unwrap();
@@ -97,6 +101,17 @@ assert_eq!(i64::try_from(eq).unwrap(), 1500);
 // RKM style notation
 let eq2 = EQ::<i64>::from_str("1k5").unwrap();
 assert_eq!(eq, eq2);
+
+// Conversion to the nearest integer
+let eq3 = EQ::<i32>::from_str("3m").unwrap();
+assert_eq!(i32::try_from(eq3).unwrap(), 0);
+// Convert to Ratio
+let r : Ratio<i32> = eq3.try_into().unwrap();
+assert_eq!(r, Ratio::new(3, 1000)); // => 3 / 1000
+assert!(r > Ratio::new(2, 1000));
+// Convert to float
+let f : f64 = eq3.try_into().unwrap();
+assert_eq!(f, 0.003);
 ```
 
 #### Number to string
@@ -128,7 +143,6 @@ assert_eq!("123k4", 123456.to_rkm(4));
 
 # Limitations
 
-* This crate only supports integers at the present time. The smaller multipliers (m, μ, n, p, f, a, z, y, r, q) are not currently supported.
 * Multipliers which are not a power of 1000 (da, h, d, c) are not supported.
 
 # Alternatives
