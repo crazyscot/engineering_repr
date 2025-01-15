@@ -187,7 +187,7 @@ impl<T: EQSupported<T> + From<EngineeringQuantity<T>>> Ord for EngineeringQuanti
     }
 }
 
-// Type conversions
+// Storage type conversion
 impl<T: EQSupported<T>> EngineeringQuantity<T> {
     /// Conversion to a different storage type.
     /// If you can convert from type A to type B,
@@ -218,9 +218,7 @@ impl<T: EQSupported<T>> EngineeringQuantity<T> {
         let (sig, exp) = self.to_raw();
         EngineeringQuantity::<U>::from_raw(sig.try_into().map_err(|_| Error::Overflow)?, exp)
     }
-}
 
-impl<T: EQSupported<T>> EngineeringQuantity<T> {
     /// Scales the number to remove any unnecessary groups of trailing zeroes.
     #[must_use]
     pub fn normalise(self) -> Self {
@@ -328,7 +326,7 @@ impl<T: EQSupported<T>> ToPrimitive for EngineeringQuantity<T>
 where
     f64: TryFrom<EngineeringQuantity<T>>,
 {
-    /// Converts `self` to an `i64`. If teh value cannot be represented by an `i64`, then `None` is returned.
+    /// Converts `self` to an `i64`. If the value cannot be represented by an `i64`, then `None` is returned.
     /// ```
     /// use num_traits::cast::ToPrimitive as _;
     /// let e = engineering_repr::EngineeringQuantity::<u32>::from(65_537u32);

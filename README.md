@@ -28,62 +28,67 @@ For example:
 And so on going up the SI prefixes, including the new ones R (10<sup>27</sup>) and Q (10<sup>30</sup>) which were added in 2022.
 
 This crate exists to support convenient conversion of numbers to/from engineering and RKM notation.
-The intended use case is reading user-entered strings from configuration files.
+The intended use case is for parsing user-entered configuration.
 
 ## Detail
 
-This crate is centred around the `EngineeringQuantity<T>` type.
+This crate is centred around the `EngineeringQuantity<T>` type. This type supports comparisons via `PartialEq`, `Eq`, `PartialOrd` and `Ord`, though if you want to perform actual maths you are probably better off converting to int or `Ratio`.
+
+### Storage
 
 * The generic parameter `T` specifies the storage type to use for the significand.
-  This can be any primitive integer except for `i8` or `u8`.
+  This can be any primitive integer except for `i8` or `u8`, which are too small to be useful.
   * For example, `EngineeringQuantity<u64>`.
-* The exponent is always stored as an `i8`.
+* The exponent is always stored as an `i8`. This can range from -10 (q) to +10 (Q); going beyond that will likely cause `Overflow` or `Underflow` errors.
+
+### Conversions
 
 You can convert an `EngineeringQuantity` to:
-* type `T`, or a larger integer type (one which implements `From<T>`)
-* String, optionally via the `DisplayAdapter` type for control over the output.
-* another `EngineeringQuantity` of a larger storage type (see `convert`; the new type must implement `From<T>`)
-* floats (`f32` or `f64`) _(note that this is a one-way conversion)_
-* `num_rational::Ratio`
-* its component parts, as a tuple `(<T>, i8)` (see `to_raw`)
+* integer types, truncating any fraction:
+  * directly `into` type `T`, or a larger integer type (one which implements `From<T>`);
+  * any integer type using the `num_traits::ToPrimitive` trait (`to_i32()` and friends, which apply an overflow check);
+* String, optionally via the `DisplayAdapter` type to control the formatting;
+* another `EngineeringQuantity` (`convert` if the destination storage type is larger; `try_convert` if it is smaller);
+* `f32` and `f64` (with an over/underflow check);
+* `num_rational::Ratio` (with an over/underflow check);
+* its component parts, as a tuple `(<T>, i8)` (see `to_raw`).
 
 You can create an `EngineeringQuantity` from:
-* type `T`, or a smaller integer type (one which implements `Into<T>`)
-* String or `&str`, which autodetects both standard and RKM code variants
-* `num_rational::Ratio`
-* its component parts `(<T>, i8)` (see `from_raw`)
-  * N.B. this applies an overflow check; it will fail if the number cannot fit into `T`.
+* type `T`, or a smaller integer type (one which implements `Into<T>`);
+* String or `&str`, which autodetects both standard and RKM code variants;
+* `num_rational::Ratio`, which requires the denominator be a power of 1000;
+* its component parts `(<T>, i8)` (see `from_raw`), which will overflow if the converted number cannot fit into `T`.
 
-Primitive types may be converted directly to string via the `EngineeringRepr` convenience trait.
+Supported integer types may be converted directly to string via the `EngineeringRepr` convenience trait.
 
 Or, if you prefer, here are the type relations in diagram form:
 
 ```text
-    ╭─────────────────────╮    ╭─────────────────────╮    ╭───────────╮
-    │      integers       │    │    integer types    │    │ raw tuple │
-    │    (T or larger)    │    │    (T or smaller)   │    │  (T, i8)  │
-    ╰─────────────────────╯    ╰─────────────────────╯    ╰───────────╯
-      ╵          ▲                       │                 ▲         │
-      ╵          │ From                  │ From            │ From    │ TryFrom
-      ╵          │                       ▼                 │         ▼
-      ╵       ┌───────────────────────────────────────────────────────────┐
-      ╵       │              EngineeringQuantity<T>                       │
-      ╵       └───────────────────────────────────────────────────────────┘
-      ╵                                  │                 ▲          │
-      ╵       ┌─────────────────────┐    │                 │          │
-      ╵ impl  │   EngineeringRepr   │    │ (configurable   │ FromStr  │ Display
-      └−−−−−▶ │ (convenience trait) │    │ format)         │          │
-              └─────────────────────┘    │                 │          │
-                │ to_eng(), to_rkm()     │                 │          │
-                ▼                        │                 │          │
-              ┌─────────────────────┐    │                 │          │
-              │  DisplayAdapter<T>  │ ◀──┘                 │          │
-              └─────────────────────┘                      │          │
-                │ Display                                  │          │
-                ▼                                          │          │
-              ╭─────────────────────╮                      │          │
-              │       String        │ ─────────────────────┘          │
-              ╰─────────────────────╯ ◀───────────────────────────────┘
+                                            ┌────────────────────┐
+                                            │      integers      │
+                                            └────────────────────┘
+                                              ▲                I
+                                              ╵                I [impl]
+                                              ╵                I
+                                              ▼                ▼
+          ┌───────────────────────────────────────────┐  ┌─────────────────────┐
+          │           EngineeringQuantity<T>          │  │   EngineeringRepr   │
+          │                                           │  │ (convenience trait) │
+          └───────────────────────────────────────────┘  └─────────────────────┘
+            ▲             ▲            ╵        ▲    │        │
+            ╵             ╵            ╵        ╵    │        │ to_eng()
+            ╵             ╵            ╵        ╵    │        │ to_rkm()
+            ▼             ▼            ▼        ╵    ▼        ▼
+┌─────────────┐  ┌────────────────┐  ┌───────┐  ╵   ┌───────────────────┐
+│ "raw" tuple │  │ num_rational:: │  │  f32  │  ╵   │ DisplayAdapter<T> │
+│   (T, i8)   │  │    Ratio<T>    │  │  f64  │  ╵   │                   │
+└─────────────┘  └────────────────┘  └───────┘  ╵   └───────────────────┘
+                                                ╵       │
+                                                ╵       │
+                                                ▼       ▼
+                                           ┌───────────────────┐
+                                           │      String       │
+                                           └───────────────────┘
 ```
 
 ### Examples
@@ -108,10 +113,9 @@ assert_eq!(i32::try_from(eq3).unwrap(), 0);
 // Convert to Ratio
 let r : Ratio<i32> = eq3.try_into().unwrap();
 assert_eq!(r, Ratio::new(3, 1000)); // => 3 / 1000
-assert!(r > Ratio::new(2, 1000));
 // Convert to float
 let f : f64 = eq3.try_into().unwrap();
-assert_eq!(f, 0.003);
+assert_eq!(f, 0.003); // caution, not all float conversions will work out exactly
 ```
 
 #### Number to string
@@ -135,7 +139,7 @@ assert_eq!(ee2.with_precision(0).to_string(), "1.234567M");
 assert_eq!(ee2.rkm_with_precision(0).to_string(), "1M234567");
 ```
 
-#### Convenience trait
+#### Integer directly to string via convenience trait
 ```rust
 use engineering_repr::EngineeringRepr as _;
 assert_eq!("123.45k", 123456.to_eng(5));
