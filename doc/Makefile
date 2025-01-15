@@ -1,3 +1,2 @@
-.SUFFIXES: .svg .dot
-.dot.svg: $<
-	dot $< -O -Tsvg
+%.svg : %.dot
+	dot $< -Tsvg -o $@

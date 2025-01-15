@@ -1,0 +1,37 @@
+digraph "types" {
+    edge [fontsize=9];
+    node [fontname="Helvetica"]
+    node [shape=box style="rounded" fontsize=9]
+    {
+        node [fillcolor=lightgoldenrodyellow style=filled shape=box];
+        EQ [label = "EngineeringQuantity<T>"];
+        DA [label = "DisplayAdapter<T>"];
+        ER_trait [label = "EngineeringRepr\n(convenience trait)" shape=box];
+    }
+    subgraph OFF_cluster_converts {
+        graph [penwidth=0]
+        ints [label = "integers"]
+        tuple [label = "\"raw\" tuple\n(T, i8)"]
+        ratio [label = "num_rational::\nRatio<T>"]
+        floats [label = "f32, f64"]
+    }
+    str [label = "String"];
+
+    str -> EQ [dir=both style=dashed]
+
+    ints -> EQ  [dir=both style=dashed]
+    EQ -> tuple [dir=both style=dashed]
+    EQ -> floats [style=dashed]
+    EQ -> ratio [dir=both style=dashed]
+
+    EQ -> DA #[label="(configurable\nformat)"];
+
+    ints -> ER_trait [label="  impl" style=tapered];
+    ER_trait -> DA [label=" to_eng()\n to_rkm()"];
+    DA -> str # [label="Display"];
+
+}
+
+# TODO:
+# rename this to 1.0
+# remake/rename the svg
