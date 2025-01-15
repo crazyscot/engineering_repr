@@ -115,18 +115,12 @@ impl<T: EQSupported<T> + FromStr> FromStr for EngineeringQuantity<T> {
         #[allow(clippy::cast_possible_wrap)]
         let mut exponent = exponent;
         match trailing.len() % 3 {
-            0 => {
-                exponent -= whole_groups;
-            }
-            1 => {
+            0 => exponent -= whole_groups,
+            n => {
+                // n must be 1 or 2
                 exponent -= whole_groups + 1;
-                to_convert.push_str("00");
+                to_convert.push_str("0".repeat(3 - n).as_str());
             }
-            2 => {
-                exponent -= whole_groups + 1;
-                to_convert.push('0');
-            }
-            3.. => panic!("impossible"), // coverage cannot reach this line
         }
 
         let significand = T::from_str(&to_convert).map_err(|_| Error::ParseError)?;
