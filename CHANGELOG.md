@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0](https://github.com/crazyscot/engineering_repr/compare/v0.3.1...v1.0.0)
+
+### ⛰️ Features
+
+- Add strict precision option for string conversions; make default sloppy - ([954f10e](https://github.com/crazyscot/engineering_repr/commit/954f10ed73b3a375065e07c6e00fc387b3897287))
+- Conversion to f64 and f32 - ([066120a](https://github.com/crazyscot/engineering_repr/commit/066120a010080a0a1af350415e43c88307928777))
+- Support the smaller multipliers (milli, micro, etc) - ([17d3b0d](https://github.com/crazyscot/engineering_repr/commit/17d3b0d263c1f16a7e9c5fe0d1bc8ba10bee9216))
+
+### 🧪 Testing
+
+- Minor refactor to improve coverage - ([b78c1ae](https://github.com/crazyscot/engineering_repr/commit/b78c1ae519f4915516b42b37887fe57181ad9162))
+- Switch from more-asserts to assertables - ([909c833](https://github.com/crazyscot/engineering_repr/commit/909c83308551b6ff897a7d0e6ace10cdb8b28b01))
+
+
 ## [0.3.1](https://github.com/crazyscot/engineering_repr/compare/v0.3.0...v0.3.1)
 
 ### 🐛 Bug Fixes
