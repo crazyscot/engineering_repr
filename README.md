@@ -91,6 +91,19 @@ Or, if you prefer, here are the type relations in diagram form:
                                            └───────────────────┘
 ```
 
+### Serialization
+
+The `serde` feature flag adds support for `EngineeringQuantity`:
+
+* Serialization as a String (only);
+* Deserialization from a String or an integer
+
+Deserialization is subject to range checks and will fail if, for example,
+the number does not fit into the underlying storage type.
+
+If you need more control than this, you may wish to specify a custom
+serializer / deserializer.
+
 ### Examples
 
 #### String to number
@@ -145,6 +158,22 @@ use engineering_repr::EngineeringRepr as _;
 assert_eq!("123.45k", 123456.to_eng(5));
 assert_eq!("123.456k", 123456.to_eng(0)); // automatic precision
 assert_eq!("123k4", 123456.to_rkm(4));
+```
+
+#### Serialization
+
+```rust
+#[cfg(feature="serde")] // This functionality requires the `serde` feature flag
+{
+use engineering_repr::EngineeringQuantity as EQ;
+let eq1 = EQ::<i32>::from(1200);
+// Serialization to string
+assert_eq!(serde_json::to_string(&eq1).unwrap(), "\"1.2k\"");
+// Deserialization from string
+assert_eq!(serde_json::from_str::<EQ<i32>>("\"1.2k\"").unwrap(), eq1);
+// Deserialization from integer
+assert_eq!(serde_json::from_str::<EQ<i32>>("1200").unwrap(), eq1);
+}
 ```
 
 # Limitations
