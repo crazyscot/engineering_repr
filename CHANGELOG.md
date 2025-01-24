@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0](https://github.com/crazyscot/engineering_repr/compare/v1.0.0...v1.1.0)
+
+### ⛰️ Features
+
+- *(serde)* Allow deserialization from integer or string - ([bf2ca78](https://github.com/crazyscot/engineering_repr/commit/bf2ca780a5044972cc5ca1a329bb68815dedc03f))
+
+
 ## [1.0.0](https://github.com/crazyscot/engineering_repr/compare/v0.3.1...v1.0.0)
 
 ### ⛰️ Features

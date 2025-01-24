@@ -1,7 +1,7 @@
 [package]
 name = "engineering-repr"
 description = "Numeric conversions for engineering notation (1.23k) and the RKM code variant (1k23)"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2021"
 authors = ["Ross Younger <qcp@crazyscot.com>"]
 license = "MIT"
