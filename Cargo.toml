@@ -16,10 +16,10 @@ num-integer = { version = "0.1" }
 num-rational = { version = "0.4" }
 num-traits = { version = "0.2", default-features = false }
 serde = { version = "1.0", features = ["derive"], optional = true }
-thiserror = "2"
+thiserror = "2.0"
 
 [dev-dependencies]
-assertables = "9.5.0"
+assertables = "9.7.0"
 serde_json = "1.0"
 
 [features]
