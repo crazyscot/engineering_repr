@@ -7,12 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.1](https://github.com/crazyscot/engineering_repr/compare/v1.1.0...v1.1.1)
+
+### ⚙️ Miscellaneous Tasks
+
+- _(ci)_ Overhaul CI; fixups to pass CI - ([f3a6192](https://github.com/crazyscot/engineering_repr/commit/f3a6192232ffde45f09557c621729a27d437cc14))
+- Declare correct MSRV - ([bd1bbfe](https://github.com/crazyscot/engineering_repr/commit/bd1bbfe7dcfcfb8401684db6c9f751a981eb9046))
+
 ## [1.1.0](https://github.com/crazyscot/engineering_repr/compare/v1.0.0...v1.1.0)
 
 ### ⛰️ Features
 
-- *(serde)* Allow deserialization from integer or string - ([bf2ca78](https://github.com/crazyscot/engineering_repr/commit/bf2ca780a5044972cc5ca1a329bb68815dedc03f))
-
+- _(serde)_ Allow deserialization from integer or string - ([bf2ca78](https://github.com/crazyscot/engineering_repr/commit/bf2ca780a5044972cc5ca1a329bb68815dedc03f))
 
 ## [1.0.0](https://github.com/crazyscot/engineering_repr/compare/v0.3.1...v1.0.0)
 
@@ -27,14 +33,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Minor refactor to improve coverage - ([b78c1ae](https://github.com/crazyscot/engineering_repr/commit/b78c1ae519f4915516b42b37887fe57181ad9162))
 - Switch from more-asserts to assertables - ([909c833](https://github.com/crazyscot/engineering_repr/commit/909c83308551b6ff897a7d0e6ace10cdb8b28b01))
 
-
 ## [0.3.1](https://github.com/crazyscot/engineering_repr/compare/v0.3.0...v0.3.1)
 
 ### 🐛 Bug Fixes
 
 - ToPrimitive copes gracefully with large negative exponents - ([4753d21](https://github.com/crazyscot/engineering_repr/commit/4753d21ab3eba9a2f43059f4cf3d5e77d834d879))
 - Don't crash when significand and exponent combine to be too large for the destination type - ([5f72609](https://github.com/crazyscot/engineering_repr/commit/5f7260955708abc0377524d918af77152bc3922d))
-
 
 ## [0.3.0](https://github.com/crazyscot/engineering_repr/compare/v0.2.0...v0.3.0)
 
@@ -64,7 +68,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Update workflows and IDE config to suit working with feature flags - ([51f4f21](https://github.com/crazyscot/engineering_repr/commit/51f4f21e0ddad7647f6afa182ec8ba5060bdac90))
 - Fix docs badge in README - ([2f9d852](https://github.com/crazyscot/engineering_repr/commit/2f9d8522d66f6f0e0ef369eb917ad24f7de74c89))
-
 
 ## [0.1.0]
 
