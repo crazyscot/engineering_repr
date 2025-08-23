@@ -1,4 +1,4 @@
-//! Conversions to [`num::rational::Ratio`] and float
+//! Conversions to [`num_rational::Ratio`] and float
 
 use num_rational::Ratio;
 use num_traits::checked_pow;

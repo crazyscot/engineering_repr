@@ -19,7 +19,7 @@ impl<T: EQSupported<T>> Serialize for EngineeringQuantity<T> {
     }
 }
 
-struct EQVisitor<U: EQSupported<U>>(pub PhantomData<U>);
+struct EQVisitor<U: EQSupported<U>>(PhantomData<U>);
 impl<U: EQSupported<U>> EQVisitor<U> {
     fn new() -> Self {
         Self(PhantomData)

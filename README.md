@@ -3,7 +3,7 @@
 [![Build status](https://github.com/crazyscot/engineering_repr/actions/workflows/rust.yml/badge.svg)](https://github.com/crazyscot/engineering_repr/actions/workflows/rust.yml)
 [![Documentation](https://img.shields.io/docsrs/engineering-repr)](https://docs.rs/engineering_repr/)
 ![License](https://img.shields.io/badge/license-MIT-blue)
-[![Coverage](https://coveralls.io/repos/github/crazyscot/engineering_repr/badge.svg?branch=main)](https://coveralls.io/github/crazyscot/engineering_repr?branch=main)
+[![codecov](https://codecov.io/gh/crazyscot/engineering_repr/graph/badge.svg?token=UVDWBPDNDD)](https://codecov.io/gh/crazyscot/engineering_repr)
 
 Numeric conversions for [engineering notation](https://en.wikipedia.org/wiki/Engineering_notation)
 and [RKM code](https://en.wikipedia.org/wiki/RKM_code).
@@ -16,14 +16,14 @@ This is normally done by writing the SI multiplier after the quantity. In the "R
 
 For example:
 
-| Number  | Engineering | RKM  |
-| --:     | --:         | --:  |
-| 42      | 42          | 42   |
-| 999     | 999         | 999  |
-| 1000    | 1k          | 1k   |
-| 1500    | 1.5k        | 1k5  |
-| 42900   | 42.9k       | 42k9 |
-| 2340000 | 2.34M       | 2M34 |
+|  Number | Engineering |  RKM |
+| ------: | ----------: | ---: |
+|      42 |          42 |   42 |
+|     999 |         999 |  999 |
+|    1000 |          1k |   1k |
+|    1500 |        1.5k |  1k5 |
+|   42900 |       42.9k | 42k9 |
+| 2340000 |       2.34M | 2M34 |
 
 And so on going up the SI prefixes, including the new ones R (10<sup>27</sup>) and Q (10<sup>30</sup>) which were added in 2022.
 
@@ -36,28 +36,30 @@ This crate is centred around the `EngineeringQuantity<T>` type. This type suppor
 
 ### Storage
 
-* The generic parameter `T` specifies the storage type to use for the significand.
+- The generic parameter `T` specifies the storage type to use for the significand.
   This can be any primitive integer except for `i8` or `u8`, which are too small to be useful.
-  * For example, `EngineeringQuantity<u64>`.
-* The exponent is always stored as an `i8`. This can range from -10 (q) to +10 (Q); going beyond that will likely cause `Overflow` or `Underflow` errors.
+  - For example, `EngineeringQuantity<u64>`.
+- The exponent is always stored as an `i8`. This can range from -10 (q) to +10 (Q); going beyond that will likely cause `Overflow` or `Underflow` errors.
 
 ### Conversions
 
 You can convert an `EngineeringQuantity` to:
-* integer types, truncating any fraction:
-  * directly `into` type `T`, or a larger integer type (one which implements `From<T>`);
-  * any integer type using the `num_traits::ToPrimitive` trait (`to_i32()` and friends, which apply an overflow check);
-* String, optionally via the `DisplayAdapter` type to control the formatting;
-* another `EngineeringQuantity` (`convert` if the destination storage type is larger; `try_convert` if it is smaller);
-* `f32` and `f64` (with an over/underflow check);
-* `num_rational::Ratio` (with an over/underflow check);
-* its component parts, as a tuple `(<T>, i8)` (see `to_raw`).
+
+- integer types, truncating any fraction:
+  - directly `into` type `T`, or a larger integer type (one which implements `From<T>`);
+  - any integer type using the `num_traits::ToPrimitive` trait (`to_i32()` and friends, which apply an overflow check);
+- String, optionally via the `DisplayAdapter` type to control the formatting;
+- another `EngineeringQuantity` (`convert` if the destination storage type is larger; `try_convert` if it is smaller);
+- `f32` and `f64` (with an over/underflow check);
+- `num_rational::Ratio` (with an over/underflow check);
+- its component parts, as a tuple `(<T>, i8)` (see `to_raw`).
 
 You can create an `EngineeringQuantity` from:
-* type `T`, or a smaller integer type (one which implements `Into<T>`);
-* String or `&str`, which autodetects both standard and RKM code variants;
-* `num_rational::Ratio`, which requires the denominator be a power of 1000;
-* its component parts `(<T>, i8)` (see `from_raw`), which will overflow if the converted number cannot fit into `T`.
+
+- type `T`, or a smaller integer type (one which implements `Into<T>`);
+- String or `&str`, which autodetects both standard and RKM code variants;
+- `num_rational::Ratio`, which requires the denominator be a power of 1000;
+- its component parts `(<T>, i8)` (see `from_raw`), which will overflow if the converted number cannot fit into `T`.
 
 Supported integer types may be converted directly to string via the `EngineeringRepr` convenience trait.
 
@@ -95,8 +97,8 @@ Or, if you prefer, here are the type relations in diagram form:
 
 The `serde` feature flag adds support for `EngineeringQuantity`:
 
-* Serialization as a String (only);
-* Deserialization from a String or an integer
+- Serialization as a String (only);
+- Deserialization from a String or an integer
 
 Deserialization is subject to range checks and will fail if, for example,
 the number does not fit into the underlying storage type.
@@ -107,6 +109,7 @@ serializer / deserializer.
 ### Examples
 
 #### String to number
+
 ```rust
 use engineering_repr::EngineeringQuantity as EQ;
 use std::str::FromStr as _;
@@ -132,6 +135,7 @@ assert_eq!(f, 0.003); // caution, not all float conversions will work out exactl
 ```
 
 #### Number to string
+
 ```rust
 use engineering_repr::EngineeringQuantity as EQ;
 
@@ -153,6 +157,7 @@ assert_eq!(ee2.rkm_with_precision(0).to_string(), "1M234567");
 ```
 
 #### Integer directly to string via convenience trait
+
 ```rust
 use engineering_repr::EngineeringRepr as _;
 assert_eq!("123.45k", 123456.to_eng(5));
@@ -178,9 +183,9 @@ assert_eq!(serde_json::from_str::<EQ<i32>>("1200").unwrap(), eq1);
 
 # Limitations
 
-* Multipliers which are not a power of 1000 (da, h, d, c) are not supported.
+- Multipliers which are not a power of 1000 (da, h, d, c) are not supported.
 
 # Alternatives
 
-* [human-repr](https://crates.io/crates/human-repr) is great for converting numbers to human-friendly representations.
-* [humanize-rs](https://crates.io/crates/humanize-rs) is great for converting some human-friendly representations to numbers, though engineering-repr offers more flexibility.
+- [human-repr](https://crates.io/crates/human-repr) is great for converting numbers to human-friendly representations.
+- [humanize-rs](https://crates.io/crates/humanize-rs) is great for converting some human-friendly representations to numbers, though engineering-repr offers more flexibility.
