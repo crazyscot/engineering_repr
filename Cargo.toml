@@ -3,6 +3,7 @@ name = "engineering-repr"
 description = "Numeric conversions for engineering notation (1.23k) and the RKM code variant (1k23)"
 version = "1.1.0"
 edition = "2021"
+rust-version = "1.74.0"
 authors = ["Ross Younger <qcp@crazyscot.com>"]
 license = "MIT"
 repository = "https://github.com/crazyscot/engineering_repr/"
