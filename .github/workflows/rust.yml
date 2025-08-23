@@ -88,7 +88,7 @@ jobs:
           toolchain: nightly-2025-07-31
           components: llvm-tools-preview,rust-src
       - uses:
-          taiki-e/install-action@33734a118689b0b418824fb78ea2bf18e970b43b # v2.50.4
+          taiki-e/install-action@f63c33fd96cc1e69a29bafd06541cf28588b43a4 # v2.58.21
           # this action is used in multiple places
         with:
           tool: cargo-llvm-cov
