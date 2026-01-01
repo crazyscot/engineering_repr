@@ -26,3 +26,7 @@ updates:
     commit-message:
       prefix: "chore(ci)"
       include: "scope"
+    groups:
+      github-actions:
+        patterns:
+          - "actions"
