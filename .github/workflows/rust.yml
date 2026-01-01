@@ -107,7 +107,7 @@ jobs:
           name: lcov.info
           path: lcov.info
       - name: Send result to codecov
-        uses: codecov/codecov-action@fdcc8476540edceab3de004e990f80d881c6cc00 # v5.5.0
+        uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
         with:
           #files: lcov.info # not needed, it autodetects
           #verbose: true # not needed
