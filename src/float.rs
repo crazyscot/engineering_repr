@@ -140,7 +140,7 @@ mod test {
             let ratio = Ratio::new(*num, *denom);
             let eq: EQ<i64> = ratio.try_into().unwrap();
             let expected = EQ::from_raw(*sig, *exp).unwrap();
-            assert_eq!(eq, expected, "inputs: {num:?}, {denom:?}",);
+            assert_eq!(eq, expected, "inputs: {num:?}, {denom:?}");
         }
     }
 
