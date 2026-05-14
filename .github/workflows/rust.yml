@@ -7,6 +7,8 @@ on:
     branches: ["main", "dev"]
   workflow_dispatch:
 
+permissions: {}
+
 env:
   CARGO_TERM_COLOR: always
   CLICOLOR_FORCE: 1
@@ -27,9 +29,11 @@ jobs:
           - rust-version: nightly
             cache: false
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # 6.0.1
+        with:
+          persist-credentials: false
       - name: Install Rust ${{ matrix.rust-version }}
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@f7ccc83f9ed1e5b9c81d8a67d7ad1a747e22a561
         with:
           toolchain: ${{ matrix.rust-version }}
           components: rustfmt,clippy,rust-src
@@ -56,13 +60,17 @@ jobs:
     env:
       RUSTDOCFLAGS: -Dwarnings
     steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@master
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # 6.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@f7ccc83f9ed1e5b9c81d8a67d7ad1a747e22a561
         with:
           # update periodically
           toolchain: nightly-2025-07-31
           components: rust-src
-      - uses: dtolnay/install@cargo-docs-rs
+      - uses: dtolnay/install@b2464e56f40a0193c82503a074e7ccf9dd2d7f40 # 2025-09-07
+        with:
+          crate: cargo-docs-rs
       ####### Ensure all tools are loaded before rust-cache, or they will be cached themselves ######
       #- uses:
       #    Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
@@ -78,14 +86,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # 6.0.1
+        with:
+          persist-credentials: false
       - name: Install Rust
         uses:
-          dtolnay/rust-toolchain@master
+          dtolnay/rust-toolchain@f7ccc83f9ed1e5b9c81d8a67d7ad1a747e22a561
           # this action is used in multiple places
         with:
           # update periodically
-          toolchain: nightly-2025-07-31
+          toolchain: nightly-2026-04-30
           components: llvm-tools-preview,rust-src
       - uses:
           taiki-e/install-action@a983ca795126a4be4e8a44879ac5c4c3ef66cae1 # v2.65.11
@@ -102,7 +112,7 @@ jobs:
       - name: Run coverage tests
         run: cargo llvm-cov --all-features --workspace --exclude xtask@0.0.0 --lcov --output-path lcov.info
       - name: Upload coverage artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: lcov.info
           path: lcov.info
